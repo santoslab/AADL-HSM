@@ -1,0 +1,126 @@
+\documentclass[10pt,oneside]{book}
+\usepackage[T1]{fontenc}
+\usepackage{isabelle,isabellesym}
+
+% further packages required for unusual symbols (see also
+% isabellesym.sty), use only when needed
+
+%\usepackage{amssymb}
+  %for \<leadsto>, \<box>, \<diamond>, \<sqsupset>, \<mho>, \<Join>,
+  %\<lhd>, \<lesssim>, \<greatersim>, \<lessapprox>, \<greaterapprox>,
+  %\<triangleq>, \<yen>, \<lozenge>
+
+%\usepackage{eurosym}
+  %for \<euro>
+
+%\usepackage[only,bigsqcap,bigparallel,fatsemi,interleave,sslash]{stmaryrd}
+  %for \<Sqinter>, \<Parallel>, \<Zsemi>, \<Parallel>, \<sslash>
+
+%\usepackage{eufrak}
+  %for \<AA> ... \<ZZ>, \<aa> ... \<zz> (also included in amssymb)
+
+%\usepackage{textcomp}
+  %for \<onequarter>, \<onehalf>, \<threequarters>, \<degree>, \<cent>,
+  %\<currency>
+
+% this should be the last package used
+\usepackage{pdfsetup}
+
+% urls in roman style, theory text in math-similar italics
+\urlstyle{rm}
+\isabellestyle{it}
+
+% for uniform font size
+%\renewcommand{\isastyle}{\isastyleminor}
+
+%%% smaller margins, wider text
+
+\addtolength{\oddsidemargin}{-.75in}
+\addtolength{\evensidemargin}{-.75in}
+\addtolength{\textwidth}{1.5in}
+
+% \addtolength{\topmargin}{-.875in}
+% \addtolength{\textheight}{1.75in}
+
+
+\begin{document}
+
+\title{Mechanized Abstract Semantics of AADL \\  as implemented by HAMR}
+\author{Stefan Hallerstede and John Hatcliff}
+\maketitle
+
+\tableofcontents
+
+% sane default for proof documents
+\parindent 0pt\parskip 0.5ex
+
+%% ToDo: Figure out how to get Isabelle to generate the session graph
+%% below
+%
+% \begin{center}
+%   \includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{session_graph.pdf}
+% \end{center}
+
+\newpage
+
+% generated text of all theories
+% \input{session}
+
+\part{Static Model Structure}
+
+\input{Model.tex}
+
+\part{Runtime State and Behavior}
+
+\chapter{Representing AADL Runtime State Information}
+
+\input{VarState.tex}
+\input{Queue.tex}
+\input{PortState.tex}
+\input{ThreadState.tex}
+\input{SystemState.tex}
+
+\chapter{AADL Runtime Thread Dispatching Behavior}
+
+\input{DispatchLogic.tex}
+
+\chapter{Thread Application Behavior}
+
+\input{App.tex}
+
+\chapter{System Behavior}
+
+\input{Behavior.tex}
+
+\chapter{Verification Framework}
+
+\input{Properties.tex}
+
+% optional bibliography
+%\bibliographystyle{abbrv}
+%\bibliography{root}
+
+\part{Libraries}
+
+\chapter{Libraries}
+
+\input{SetsAndMaps}
+
+
+\part{Examples}
+
+\chapter{Model Examples}
+
+\input{TempControlModel}
+
+\chapter{Initial State Examples}
+
+
+
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:
