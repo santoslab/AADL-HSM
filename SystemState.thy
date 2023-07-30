@@ -1,11 +1,22 @@
 section \<open>System States\<close>
 
+text \<open>An AADL runtime system state includes the state of each of the threads
+in the system, the state of the inter-thread communication substrate, 
+and the state of various system services associated with scheduling, etc.
+
+This theory uses definitions ThreadState.thy (for representing the state
+of threads) and Model.thy (for aligning the state elements with model 
+information).\<close>
+
 theory SystemState
   imports Main Model ThreadState
 begin
 
-text \<open>AADL executions are separated into an \emph{Initializing} phase and a 
-\emph{Computing} phase.   
+subsection \<open>System Phase Structures\<close>
+
+text \<open>AADL executions are separated into an \emph{Initializing} phase and a
+\emph{Computing} phase (see the standard - Section 5.4.1 Clause (21), 
+Section 13.3 Clause (7)).  
 
 In the Initializing phase, each thread's
 application code Initialize Entry Point executed once.  The application
@@ -16,6 +27,8 @@ In the Computing phase, the Compute Entry Point application code for each thread
 is executed repeated, according to the thread scheduling policy.\<close>
 
 datatype Phase = Initializing | Computing
+
+subsection \<open>Scheduling State Structures\<close>
 
 text \<open>From the scheduler's perspective, each thread is either
 \begin{itemize}
@@ -45,6 +58,30 @@ scheduling strategy.\<close>
 
 datatype Exec = Initialize "CompId list" | Compute "CompId"
 
+text \<open>Since Thread Initialize entry points do not read input ports, the ordering
+of the execution of Initialize entry point is immaterial (see the standard Section 13.3 Clause (8).
+We will subsequently prove that our semantics definitions support this independence property.\<close>
+
+text \<open>For now, the notion of system schedule is instantiated to a static cyclic 
+schedule.  @{term scheduleInit} provides a totally ordered thread schedule for the 
+system's initialization phase. @{term scheduleFirst} indicates set the threads
+that may be scheduled first in the system Compute phase.  For a given thread
+t, @{term ScheduleComp} defines the set of threads whose execution may follow t.\<close>
+
+record SystemSchedule =
+  scheduleInit :: "CompId list"
+  scheduleFirst :: "CompId set" (* to switch to the computation *)
+  scheduleComp :: "(CompId, CompId set) map"
+
+(*
+During initialisation scheduling, each thread's initialisation is executed once
+according to the order given in the list.
+During computation scheduling, each scheduled thread has at least one successor.
+This gives a minimal liveness guarantee.
+*)
+
+subsection \<open>System State Structures\<close>
+
 text \<open>
 The system state includes the following elements:
 \begin{itemize}
@@ -70,23 +107,7 @@ state @{term s}.\<close>
 fun systemThreadStates :: "('u, 'a) SystemState \<Rightarrow> 'a ThreadState set"
   where "systemThreadStates s = ran (systemThread s)"
 
-text \<open>For now, the notion of system schedule is instantiated to a static cyclic 
-schedule.  @{term scheduleInit} provides a totally ordered thread schedule for the 
-system's initialization phase. @{term scheduleFirst} indicates set the threads
-that may be scheduled first in the system Compute phase.  For a given thread
-t, @{term ScheduleComp} defines the set of threads whose execution may follow t.\<close>
-
-record SystemSchedule =
-  scheduleInit :: "CompId list"
-  scheduleFirst :: "CompId set" (* to switch to the computation *)
-  scheduleComp :: "(CompId, CompId set) map"
-
-(*
-During initialisation scheduling, each thread's initialisation is executed once
-according to the order given in the list.
-During computation scheduling, each scheduled thread has at least one successor.
-This gives a minimal liveness guarantee.
-*)
+subsection \<open>Well-formedness Definitions\<close>
 
 text \<open>The following definition gives well-formed conditions for system states:
 \begin{itemize}
@@ -137,7 +158,7 @@ fun isComputing :: "('a, 'u) SystemState \<Rightarrow> bool"
 
 (* Should we move the communication definitions into their own theory? *)
 
-
+subsection \<open>Communication\<close>
 
 record ('u,'a) Communication =
   comPush :: "'u \<Rightarrow> 'a PortState \<Rightarrow> Conns \<Rightarrow> ('u \<times> 'a PortState) set" 

@@ -1,4 +1,4 @@
-session "hamr-isabelle-R1" = HOL +
+session "hamr-isabelle-V1" = HOL +
   options [document = pdf, document_output = "output"]
 (*theories [document = false]
     A

@@ -1,18 +1,61 @@
+section \<open>Deductive Schemas\<close>
+
+text \<open>Definitions in this section set up schema for reasoning about system execution
+properties.  One role of the schema is to state how component-level properties to 
+support system-level properties.
+\<close>
+
 theory Properties
   imports Behavior
 begin
 
-text \<open>
-\<close>
+subsection \<open>Initialization Phase\<close>
 
-(* Initialisation property P *)
-definition appInitProp where "appInitProp a P \<equiv> \<forall>s' p'. appInit a s' p' \<longrightarrow> P (s', p')"
+text \<open>The following definition introduces a notion of a \emph{thread initialization 
+property} for thread application logic (which abstracts thread entry point code).  
+The property @{term P} holds for a thread's application logic 
+if it holds for  all output variable states @{term vs'}
+and output port states @{term ps'} that satisfy the thread's Initialize
+entry point contract (@{term appInit}).\<close>
 
-definition sysInitProp where "sysInitProp am P \<equiv> 
+definition appInitProp :: "'a App \<Rightarrow> ('a VarState * 'a PortState \<Rightarrow> bool) \<Rightarrow> bool"
+  where "appInitProp a P \<equiv> \<forall>vs' ps'. appInit a vs' ps' \<longrightarrow> P (vs', ps')"
+
+text \<open>We introduce the notion a \emph{system initialization property}.  Currently,
+the only system features that can be ``observed'' by a system property are the variable
+states and application port states of a thread.  A system initialization property
+makes observations about the results of ``executing'' the Initialization entry points
+of each thread (which only constrain variable states and output application port states.
+Therefore, the system initialization property is intuitively a family of properties 
+indexed by component identifier @{term c} where each member of the family observes
+the variables states and output application port states for a given component/thread @{term c}.
+
+The following definition states that a system initialization property @{term P} 
+holds for the app model @{term am} portion of a system when, for all threads (identifiers)
+ @{term c}, if a thread can undergo an initialize step from thread state @{term t}
+to thread state @{term t'}, then the @{term c}-relevant portion of the property
+holds for the variable state @{term tvar} and output application port state @{term appo}
+elements of thread state @{term t'}.\<close>
+
+definition sysInitProp :: "'a AppModel \<Rightarrow> (CompId \<Rightarrow> ('a VarState * 'a PortState \<Rightarrow> bool)) => bool"
+  where "sysInitProp am P \<equiv>
   \<forall>c \<in> appModelCIDs am. \<forall>t t'. stepInit (appModelApp am $ c) t t' \<longrightarrow> P c (tvar t', appo t')"
 
-definition sysInitVC where "sysInitVC am P \<equiv> 
+text \<open>Now, we set up a verification condition @{term sysInitVC} 
+for a system initialization property @{term P}.
+We intend to show that, to verify a system initialization property @{term P} (i.e., to show
+that P holds for an app model @{term am}, it is sufficient to show that for every
+thread component @{term c} in the model, the @{term c}-relevant portion of @{term P}
+is an thread initialization property (@{term appInitProp}) for @{term c} (i.e., for
+@{term c}'s application logic).\<close>
+
+definition sysInitVC :: "'a AppModel \<Rightarrow> (CompId \<Rightarrow> ('a VarState * 'a PortState \<Rightarrow> bool)) => prop"
+  where "sysInitVC am P \<equiv> 
   (\<And>c. c \<in> appModelCIDs am \<Longrightarrow> appInitProp (appModelApp am $ c) (P c))"
+
+text \<open>The following lemma establishes that @{term sysInitVC} is a sound verification
+condition for system initialization property P: for a well-formed app model @{term am},
+if @{term sysInitVC} holds, then @{term sysInitProp} holds.\<close>
 
 lemma initSysFromApps:
   assumes wf_am: "wf_AppModel am"
@@ -31,8 +74,31 @@ proof (simp only: sysInitProp_def; clarify)
   qed
 qed
 
-definition sysAllInitProp where "sysAllInitProp am P s \<equiv> 
+text \<open>The follow definition will interpret a system initialization property
+@{term P} in the context of a specific system state @{term s}.\<close>
+
+definition sysAllInitProp :: 
+  "   'a AppModel 
+   \<Rightarrow> (CompId \<Rightarrow> ('a VarState * 'a PortState \<Rightarrow> bool)) 
+   => ('u, 'a) SystemState \<Rightarrow> bool"
+  where "sysAllInitProp am P s \<equiv>
   \<forall>c \<in> appModelCIDs am. P c (tvar (systemThread s $ c), appo (systemThread s $ c))"
+
+definition systemAppInit where "systemAppInit am c = { (v, p) | v p. appModelInit am c v p }"
+
+(* work in progress
+definition varappo where "varappo x c = (tvar (systemThread x $ c), appo (systemThread x $ c))"
+
+lemma sysInit_seq:
+  assumes wf_am: "wf_AppModel am"
+      and init: "isInitializing x"
+      and step: "stepsSys am com sch x y"
+      and exec_x: "systemExec x = Initialize (scheduleInit sch)"
+      and exec_y: "systemExec y = Initialize []"
+    shows "varappo y = 
+            map_Upd_seq (systemAppInit am) (varappo x) (scheduleInit sch)"
+  sorry
+*)
 
 (*
 lemma sysInit_upd_seq:

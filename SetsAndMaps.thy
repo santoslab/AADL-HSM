@@ -46,8 +46,10 @@ next
   show "X ** (Y ** Z) \<subseteq> X ** Y ** Z" unfolding map_Add_def apply simp by force
 qed
 
-lemma map_Add_empty_right: "X ** {} = {}" unfolding map_Add_def by simp
-lemma map_Add_empty_left: "{} ** X = {}" unfolding map_Add_def by simp
+lemma map_Add_unit_right[simp]: "X ** {Map.empty} = X" unfolding map_Add_def by force
+lemma map_Add_unit_left[simp]: "{Map.empty} ** X = X" unfolding map_Add_def by force
+lemma map_Add_empty_right[simp]: "X ** {} = {}" unfolding map_Add_def by simp
+lemma map_Add_empty_left[simp]: "{} ** X = {}" unfolding map_Add_def by simp
 
 lemma map_Add_extract: "{s ++ m | s m. s \<in> S \<and> p m } = S ** { m | m. p m }"
 proof
@@ -403,6 +405,7 @@ next
   then show ?case by simp
 qed
 
+(*
 lemma map_add_seq_Merge_eq: 
   "\<lbrakk> \<forall>m\<^sub>1 \<in> M.\<forall>m\<^sub>2 \<in> M. m\<^sub>1 \<noteq> m\<^sub>2 \<longrightarrow> dom m\<^sub>1 \<inter> dom m\<^sub>2 = {}; M = set ms; card M = length ms \<rbrakk> \<Longrightarrow> map_add_seq s ms = s ++ (\<Uplus>\<^sub>m M)"
 proof (induction ms arbitrary: M s)
@@ -432,35 +435,35 @@ next
     by (metis Cons.prems(2) DiffD1 DiffD2 insertI1 list.set_intros(1) merge_comm)
   then show ?case using h7 h8 h9 x1 by presburger
 qed
-
+*)
 lemma seq_set_dom:
-  "\<forall>i j. i \<le> length ms \<and> j \<le> length ms \<and> i \<noteq> j \<longrightarrow> dom (ms!i) \<inter> dom (ms!j) = {} \<Longrightarrow> 
+  "\<forall>i j. i < length ms \<and> j < length ms \<and> dom (ms!i) \<inter> dom (ms!j) \<noteq> {} \<longrightarrow> i = j \<Longrightarrow> 
   \<forall>m\<^sub>1 \<in> set ms.\<forall>m\<^sub>2 \<in> set ms. m\<^sub>1 \<noteq> m\<^sub>2 \<longrightarrow> dom m\<^sub>1 \<inter> dom m\<^sub>2 = {}"
 proof (induction ms)
   case Nil
   then show ?case by auto
 next
   case (Cons a ms)
-  then show ?case by (metis in_set_conv_nth less_le)
+  then show ?case by (metis in_set_conv_nth)
 qed
 
 lemma map_add_seq_Merge: 
-  "\<lbrakk> \<forall>i j. i \<le> length ms \<and> j \<le> length ms \<and> i \<noteq> j \<longrightarrow> dom (ms!i) \<inter> dom (ms!j) = {}; 
-    card (set ms) \<le> length ms \<rbrakk> \<Longrightarrow> map_add_seq s ms = s ++ (\<Uplus>\<^sub>m set ms)"
+  "\<forall>i j. i < length ms \<and> j < length ms \<and> dom (ms!i) \<inter> dom (ms!j) \<noteq> {} \<longrightarrow> i = j 
+  \<Longrightarrow> map_add_seq s ms = s ++ (\<Uplus>\<^sub>m set ms)"
 proof (induction ms arbitrary: s)
   case Nil
   then show ?case by simp
 next
   case (Cons a ms)
-  have h0: "\<forall>k. k \<le> length ms \<longrightarrow> ms ! k = (a # ms) ! (Suc k)" by simp
-  have h1: "\<forall>i j. i \<le> length ms \<and> j \<le> length ms \<and> i \<noteq> j \<longrightarrow> dom (ms ! i) \<inter> dom (ms ! j) = {}"
+  have h0: "\<forall>k. k < length ms \<longrightarrow> ms ! k = (a # ms) ! (Suc k)" by simp
+  have h1: "\<forall>i j. i < length ms \<and> j < length ms \<and> dom (ms!i) \<inter> dom (ms!j) \<noteq> {} \<longrightarrow> i = j"
   proof (clarify)
     fix i j
-    assume a1: "i \<le> length ms"
-       and a2: "j \<le> length ms"
-       and a3: "i \<noteq> j"
-    then show "dom (ms ! i) \<inter> dom (ms ! j) = {}"
-      by (metis Cons.prems(1) Suc_inject h0 a1 a2 a3 length_Cons not_less_eq_eq)
+    assume a1: "i < length ms"
+       and a2: "j < length ms"
+       and a3: "dom (ms!i) \<inter> dom (ms!j) \<noteq> {}"
+    then show "i = j"
+      by (metis Cons.prems(1) Suc_leI h0 le_imp_less_Suc length_Cons old.nat.inject)
   qed
   have h2: "\<forall>m \<in> set ms. a \<noteq> m \<longrightarrow> dom a \<inter> dom m = {}" 
     by (meson Cons.prems(1) list.set_intros(1) list.set_intros(2) seq_set_dom)
@@ -468,9 +471,9 @@ next
   proof -
     assume a4: "a \<noteq> Map.empty"
     hence a5: "dom a \<noteq> {}" by simp
-    thus "a \<notin> set ms" using h0 Cons.prems(1)
-      by (metis Suc_le_mono in_set_conv_nth inf.idem length_Cons less_imp_le_nat 
-          nat.simps(3) nth_Cons_0 zero_le)
+    thus "a \<notin> set ms" using h0 Cons.prems(1) 
+      by (metis Diff_Diff_Int Diff_cancel Diff_empty Suc_less_eq in_set_conv_nth length_Cons 
+          nat.simps(3) nth_Cons_0 zero_less_Suc)
   qed
   have h3: "dom a \<inter> dom (\<Uplus>\<^sub>m set ms) = {}"
     using h2 h3 not_dom_Merge by fastforce
@@ -483,6 +486,25 @@ next
         Int_empty_right Un_empty_right disjoint_iff_not_equal domIff insert_Diff insert_Diff_single 
         map_add_dom_app_simps(1) merge_Merge_diff merge_comm mk_disjoint_insert)
   then show ?case by (metis h4 h5 h6 insert_is_Un list.simps(15) map_add_seq.simps(2) sup_commute)
+qed
+
+definition map_add_all where "map_add_all ms = map_add_seq Map.empty ms"
+
+lemma add_all: "\<forall>i j. i < length ms \<and> j < length ms \<and>dom (ms!i) \<inter> dom (ms!j) \<noteq> {} \<longrightarrow> i = j 
+    \<Longrightarrow> map_add_all ms = \<Uplus>\<^sub>m set ms"
+  using map_add_seq_Merge[of ms Map.empty]
+  by (simp add: map_add_all_def)
+
+lemma add_all_empty[simp]: "map_add_all [] = Map.empty"
+  by (simp add: map_add_all_def)
+
+lemma add_all_left: "m ++ map_add_all ms = map_add_all (m#ms)"
+proof (induction ms arbitrary: m)
+  case Nil
+  then show ?case by (simp add: map_add_all_def)
+next
+  case (Cons a ms)
+  then show ?case by (metis map_add_all_def map_add_assoc map_add_seq.simps(2))
 qed
 
 fun map_Add_seq where
@@ -512,29 +534,71 @@ next
   then show ?case by (metis list.set_cases list.set_intros(1) list.set_intros(2) map_seq_in.simps(2))
 qed
 
-lemma map_seq_in_in: 
-  "\<lbrakk>\<forall>i j. i \<le> length ms \<and> j \<le> length ms \<and> i \<noteq> j \<longrightarrow> dom (ms!i) \<inter> dom (ms!j) = {};
-    \<forall>M \<in> set Ms.\<forall>m\<^sub>1 \<in> M.\<forall>m\<^sub>2 \<in> M. dom m\<^sub>1 = dom m\<^sub>2;
-    card (set ms) \<le> length ms; 
-    map_seq_in ms Ms;
-    m\<^sub>1 \<in> set ms;
-    m\<^sub>2 \<in> set ms;
-    m\<^sub>1 \<noteq> m\<^sub>2 \<rbrakk> \<Longrightarrow> \<exists>M\<^sub>1 \<in> set Ms.\<exists>M\<^sub>2 \<in> set Ms. M\<^sub>1 \<noteq> M\<^sub>2 \<and> m\<^sub>1 \<in> M\<^sub>1 \<and> m\<^sub>2 \<in> M\<^sub>2"
+lemma map_seq_in_length: "map_seq_in ms Ms \<Longrightarrow> length ms = length Ms"
+proof (induction Ms arbitrary: ms)
+  case Nil
+  then show ?case using map_seq_in.elims(2) by auto
+next
+  case (Cons a Ms)
+  then show ?case using map_seq_in.elims(2) by force
+qed
+
+lemma map_seq_in_index: "\<lbrakk>map_seq_in ms Ms; i < length Ms\<rbrakk> \<Longrightarrow> ms ! i \<in> Ms ! i"
+proof (induction Ms arbitrary: ms i)
+  case Nil
+  then show ?case by simp
+next
+  case (Cons a Ms)
+  have h1: "map_seq_in (tl ms) Ms"
+    by (metis Cons.prems(1) list.exhaust_sel map_seq_in.simps(2) map_seq_in.simps(4))
+  show ?case
+  proof (cases "i = 0")
+    case True
+    then show ?thesis using Cons.prems(1) map_seq_in.elims(2) by fastforce
+  next
+    case False
+    obtain j where j1: "Suc j = i" by (metis False old.nat.exhaust)
+    hence h2: "j < length Ms" using Cons.prems(2) by force
+    hence h3: "(tl ms) ! j \<in> Ms ! j" by (simp add: Cons.IH h1)
+    then show ?thesis
+      by (metis Cons.prems(1) j1 list.exhaust_sel map_seq_in.simps(4) nth_Cons_Suc)
+  qed
+qed
+
+definition map_seq_of where
+  "map_seq_of ms Ms \<equiv> map_seq_in ms Ms \<and> 
+    (\<forall>i j. i < length ms \<and> j < length ms \<and> dom (ms!i) \<inter> dom (ms!j) \<noteq> {} \<longrightarrow> i = j) \<and> 
+    (\<forall>M \<in> set Ms.\<forall>m\<^sub>1 \<in> M.\<forall>m\<^sub>2 \<in> M. dom m\<^sub>1 = dom m\<^sub>2)"
+
+lemma map_seq_of_empty[simp]: "map_seq_of ms [] \<Longrightarrow> ms = []"
+  using map_seq_in.elims(2) map_seq_of_def by blast
+
+lemma map_seq_of_wk: "map_seq_of ms Ms \<Longrightarrow> map_seq_in ms Ms"
+  using map_seq_of_def by blast
+
+lemma map_seq_of_in: 
+  "\<lbrakk> map_seq_of ms Ms;
+     m\<^sub>1 \<in> set ms;
+     m\<^sub>2 \<in> set ms;
+     m\<^sub>1 \<noteq> m\<^sub>2 \<rbrakk> \<Longrightarrow> \<exists>M\<^sub>1 \<in> set Ms.\<exists>M\<^sub>2 \<in> set Ms. M\<^sub>1 \<noteq> M\<^sub>2 \<and> m\<^sub>1 \<in> M\<^sub>1 \<and> m\<^sub>2 \<in> M\<^sub>2"
 proof (induction Ms arbitrary: ms)
   case Nil
   then show ?case
-    by (metis empty_iff list.collapse map_seq_in.simps(3) set_empty)
+    unfolding map_seq_of_def by (metis empty_iff list.collapse map_seq_in.simps(3) set_empty)
 next
   case (Cons a Ms)
-  have h0: "\<forall>k. k \<le> length (tl ms) \<longrightarrow> (tl ms) ! k = ms ! (Suc k)"
-    by (metis length_greater_0_conv length_pos_if_in_set list.collapse local.Cons(6) nth_Cons_Suc)
-  then have h1: "\<forall>i j. i \<le> length (tl ms) \<and> j \<le> length (tl ms) \<and> i \<noteq> j \<longrightarrow> dom ((tl ms)!i) \<inter> dom ((tl ms)!j) = {}"
-    by (metis Cons.prems(1) Cons.prems(5) Nitpick.size_list_simp(2) Suc_le_mono 
-        length_greater_0_conv length_pos_if_in_set old.nat.inject)
-  have h2: "\<forall>M\<in>set Ms. \<forall>m\<^sub>1\<in>M. \<forall>m\<^sub>2\<in>M. dom m\<^sub>1 = dom m\<^sub>2" by (meson Cons.prems(2) list.set_intros(2))
-  have h3: "card (set (tl ms)) \<le> length (tl ms)" using card_length by blast
-  have h4: "map_seq_in (tl ms) Ms" using Cons.prems(4) map_seq_in.elims(2) by fastforce
-  have h5: "m\<^sub>1 \<noteq> m\<^sub>2" by (simp add: Cons.prems(7))
+  hence h0: "\<forall>k. k \<le> length (tl ms) \<longrightarrow> (tl ms) ! k = ms ! (Suc k)"
+    unfolding map_seq_of_def apply clarify 
+    by (metis equals0D hd_Cons_tl list.set(1) nth_Cons_Suc)  
+  then have h1: "\<forall>i j. i < length (tl ms) \<and> j < length (tl ms) \<and> dom ((tl ms)!i) \<inter> dom ((tl ms)!j) \<noteq> {} \<longrightarrow> i = j"
+    using Cons.prems unfolding map_seq_of_def apply clarify 
+    by (metis Nitpick.size_list_simp(2) Suc_inject Suc_leI le_imp_less_Suc length_greater_0_conv 
+        length_pos_if_in_set nth_tl)
+  have h2: "\<forall>M\<in>set Ms. \<forall>m\<^sub>1\<in>M. \<forall>m\<^sub>2\<in>M. dom m\<^sub>1 = dom m\<^sub>2"
+    using Cons.prems unfolding map_seq_of_def apply clarify by (meson list.set_intros(2))
+  have h4: "map_seq_in (tl ms) Ms" using Cons.prems unfolding map_seq_of_def apply clarify
+    by (metis length_greater_0_conv length_pos_if_in_set list.exhaust_sel map_seq_in.simps(2))
+  have h5: "m\<^sub>1 \<noteq> m\<^sub>2" by (simp add: Cons.prems)
   then show ?case
   proof (cases "m\<^sub>1 \<in> set (tl ms)")
     case True
@@ -544,43 +608,40 @@ next
       case True
       hence h7: "m\<^sub>2 \<in> set (tl ms)" by simp
       have "\<exists>M\<^sub>1\<in>set Ms. \<exists>M\<^sub>2\<in>set Ms. M\<^sub>1 \<noteq> M\<^sub>2 \<and> m\<^sub>1 \<in> M\<^sub>1 \<and> m\<^sub>2 \<in> M\<^sub>2"
-        using Cons.IH Cons.prems(7) h1 h2 h3 h4 h6 h7 by presburger
+        using Cons.IH Cons.prems(4) h1 h2 h4 h6 h7 unfolding map_seq_of_def
+        by (smt (verit, best) card_length)
       then show ?thesis by (meson list.set_intros(2))
     next
       case False
       hence h7: "m\<^sub>2 \<notin> set (tl ms)" by simp
-      hence x1: "m\<^sub>2 \<in> a" 
-        using Cons.prems(4) Cons.prems(6) equals0D map_seq_in.elims(2) set_ConsD by force
+      hence x1: "m\<^sub>2 \<in> a"
+        using Cons.prems(1) Cons.prems(3) list.set_cases
+        unfolding map_seq_of_def apply clarify by fastforce
       obtain M where "m\<^sub>1 \<in> M" and "M \<in> set Ms" by (meson h4 h6 map_seq_in_ex)
       then show ?thesis
-        sorry
-        (*
-        using h2 h5 x1 seq_set_dom
-        by (smt (verit, ccfv_threshold) Cons.prems(1) Cons.prems(5) Cons.prems(6) dom_eq_empty_conv 
-            inf.idem list.set_intros(1) list.set_intros(2)) *)
+        using Cons.prems(1) Cons.prems(2) Cons.prems(3) h5 x1 
+        unfolding map_seq_of_def apply clarify
+        by (smt (verit) dom_eq_empty_conv in_set_conv_nth inf.idem map_seq_in_ex)
     qed
   next
     case False
     hence h6: "m\<^sub>1 \<notin> set (tl ms)" by simp
-    hence x1: "m\<^sub>1 \<in> a" using Cons.prems(4) Cons.prems(5) list.set_cases by force
+    hence x1: "m\<^sub>1 \<in> a" using Cons.prems(1) Cons.prems(2) unfolding map_seq_of_def apply clarify
+      using list.set_cases by fastforce
     then show ?thesis
     proof (cases "m\<^sub>2 \<in> set (tl ms)")
       case True
       hence h7: "m\<^sub>2 \<in> set (tl ms)" by simp
       then show ?thesis
-        sorry 
-        (*
-        by (smt (verit, best) Cons.prems(1) Cons.prems(2) Cons.prems(4) Cons.prems(5) Cons.prems(6) 
-            dom_eq_empty_conv h5 inf.idem map_seq_in_ex seq_set_dom) *)
+        using Cons.prems(1) Cons.prems(2) Cons.prems(3) h5 unfolding map_seq_of_def apply clarify
+        by (smt (verit, best) dom_eq_empty_conv in_set_conv_nth inf.idem map_seq_in_ex)
     next
       case False
       then show ?thesis
-        by (metis Cons.prems(5) Cons.prems(6) h5 h6 hd_Cons_tl length_greater_0_conv 
-            length_pos_if_in_set set_ConsD)
+        by (metis Cons.prems(2) Cons.prems(3) h5 h6 list.exhaust_sel set_ConsD tl_Nil)
     qed
   qed
 qed
-
 
 lemma map_Add_seq_as_add_seq: 
   "map_Add_seq S Ms = {map_add_seq s ms | s ms. s \<in> S \<and> map_seq_in ms Ms}"
@@ -642,64 +703,160 @@ next
   qed
 qed
 
-lemma map_Add_seq_Merge: 
-  "\<lbrakk> \<forall>i j. i \<le> length ms \<and> j \<le> length ms \<and> i \<noteq> j \<longrightarrow> dom (ms!i) \<inter> dom (ms!j) = {}; 
-  \<forall>M \<in> set Ms.\<forall>m\<^sub>1 \<in> M.\<forall>m\<^sub>2 \<in> M. dom m\<^sub>1 = dom m\<^sub>2; card (set Ms) \<le> length Ms \<rbrakk> \<Longrightarrow> 
-  map_Add_seq S Ms = S ** {\<Uplus>\<^sub>m set ms | ms. map_seq_in ms Ms}"
-proof (induction Ms arbitrary: ms)
-  case Nil
-  show ?case
-  proof
-    show h1: "map_Add_seq S [] \<subseteq> S ** {\<Uplus>\<^sub>m set ms |ms. map_seq_in ms []}"
-      unfolding map_Add_def apply (simp; clarify)
-      by (metis Suc_leI bot_nat_0.not_eq_extremum card_length list.size(3) map_add_seq.simps(1) 
-          map_add_seq_Merge map_seq_in.simps(1) not_less_eq_eq)
-  next
-    show h2: "S ** {\<Uplus>\<^sub>m set ms |ms. map_seq_in ms []} \<subseteq> map_Add_seq S []"
-      unfolding map_Add_def apply (simp; clarify) 
-      by (metis card.empty emptyE empty_set list.size(3) map_add_seq.simps(1) map_add_seq_Merge_eq 
-          map_seq_in.simps(3) neq_Nil_conv)
-  qed
+definition Dom where "Dom X \<equiv> \<Union>x\<in>X. (dom x)"
+
+lemma Dom_single: assumes "\<exists>y. P y" shows "Dom { [a \<mapsto> y] | y. P y } = {a}"
+proof
+  show "Dom {[a \<mapsto> y] |y. P y} \<subseteq> {a}"
+    unfolding Dom_def dom_def apply (simp; clarify) using domIff by fastforce
 next
-  case (Cons a Ms)
-  then show ?case sorry
+  show "{a} \<subseteq> Dom {[a \<mapsto> y] |y. P y}"
+    using assms unfolding Dom_def dom_def apply (simp; clarify) by fastforce
 qed
 
-(*proof -
-  have h0: "\<forall>M\<^sub>1 \<in> M.\<forall>M\<^sub>2 \<in> M. M\<^sub>1 \<noteq> M\<^sub>2 \<longrightarrow> (\<forall>m\<^sub>1 \<in> M\<^sub>1.\<forall>m\<^sub>2 \<in> M\<^sub>2. m\<^sub>1 \<noteq> m\<^sub>2)"
-    using n d by auto
-  have h1: "map_Add_seq S Ms = {map_add_seq s ms | s ms. s \<in> S \<and> map_seq_in ms Ms}"
-    by (simp add: map_Add_seq_as_add_seq)
-  have h2: "... = {s ++ (\<Uplus>\<^sub>m set ms) | s ms. s \<in> S \<and> map_seq_in ms Ms}"
-  proof -
-    have "\<And>s ms. \<lbrakk>s \<in> S; map_seq_in ms Ms\<rbrakk> \<Longrightarrow> map_add_seq s ms = s ++ (\<Uplus>\<^sub>m set ms)"
-    proof -
-      fix s ms
-      assume a1: "s \<in> S"
-         and a2: "map_seq_in ms Ms"
-      have x1: "\<forall>m\<^sub>1 \<in> set ms.\<forall>m\<^sub>2 \<in> set ms. m\<^sub>1 \<noteq> m\<^sub>2 \<longrightarrow> dom m\<^sub>1 \<inter> dom m\<^sub>2 = {}"
-      proof (clarify)
-        fix m\<^sub>1 m\<^sub>2
-        assume a3: "m\<^sub>1 \<in> set ms"
-           and a4: "m\<^sub>2 \<in> set ms"
-           and a5: "m\<^sub>1 \<noteq> m\<^sub>2"
-        obtain M\<^sub>1 M\<^sub>2 where m1: "M\<^sub>1 \<in> M" and
-                           m2: "M\<^sub>2 \<in> M" and
-                           m3: "M\<^sub>1 \<noteq> M\<^sub>2" and
-                           m4: "m\<^sub>1 \<in> M\<^sub>1" and
-                           m5: "m\<^sub>2 \<in> M\<^sub>2" sorry
-        show "dom m\<^sub>1 \<inter> dom m\<^sub>2 = {}" sorry
-      qed
-      show "map_add_seq s ms = s ++ \<Uplus>\<^sub>m set ms" sorry
-    qed
-    then show ?thesis by force
+definition seq_of_maps where
+  "seq_of_maps Ms \<equiv> 
+    (\<forall>i j. i < length Ms \<and> j < length Ms \<and> Dom (Ms!i) \<inter> Dom (Ms!j) \<noteq> {} \<longrightarrow> i = j) \<and>
+    (\<forall>M \<in> set Ms.\<forall>m\<^sub>1 \<in> M.\<forall>m\<^sub>2 \<in> M. dom m\<^sub>1 = dom m\<^sub>2)"
+
+lemma seq_of_maps_hd: assumes "seq_of_maps (M#Ms)" shows "seq_of_maps Ms"
+proof -
+  have h0: "\<forall>k. k < length Ms \<longrightarrow> Ms ! k = (M#Ms) ! (Suc k)"
+    by simp
+  thus ?thesis using assms unfolding seq_of_maps_def apply clarify
+    by (metis Suc_inject Suc_leI le_imp_less_Suc length_Cons list.set_intros(2))
+qed
+
+lemma maps_seq_of: 
+  assumes M1: "seq_of_maps Ms"
+      and M2: "map_seq_in ms Ms"
+    shows "map_seq_of ms Ms"
+proof -
+  have h1: "map_seq_in ms Ms" by (simp add: M2)
+  have h2: "\<forall>i j. i < length ms \<and> j < length ms \<and> dom (ms ! i) \<inter> dom (ms ! j) \<noteq> {} \<longrightarrow> i = j"
+  proof clarify
+    fix i j
+    assume a1: "i < length ms"
+       and a2: "j < length ms"
+       and a3: "dom (ms ! i) \<inter> dom (ms ! j) \<noteq> {}"
+    have k1: "ms ! i \<in> Ms ! i" by (metis a1 h1 map_seq_in_index map_seq_in_length)
+    have k2: "ms ! j \<in> Ms ! j" by (metis a2 h1 map_seq_in_index map_seq_in_length)
+    obtain x where x1: "x \<in> dom (ms ! i)" and x2: "x \<in> dom (ms ! j)" using a3 by blast
+    have k3: "x \<in> Dom (Ms!i)" using k1 x1 unfolding Merge_def Dom_def apply clarify by blast
+    have k4: "x \<in> Dom (Ms!j)" using k2 x2 unfolding Merge_def Dom_def apply clarify by blast
+    have k5: "Dom (Ms!i) \<inter> Dom (Ms!j) \<noteq> {}" using k3 k4 by blast
+    show "i = j" using M1 unfolding seq_of_maps_def by (metis a1 a2 h1 k5 map_seq_in_length)
   qed
-  have h3: "... = {s ++ ms' | ms' s ms. s \<in> S \<and> ms' = \<Uplus>\<^sub>m set ms \<and> map_seq_in ms Ms}" by blast
-  have h4: "... = S ** {ms' | ms' ms. ms' = \<Uplus>\<^sub>m set ms \<and> map_seq_in ms Ms}" 
-    using map_Add_extract[of S "\<lambda>x. \<exists>s ms. x = \<Uplus>\<^sub>m set ms \<and> map_seq_in ms Ms"]
-    apply simp by (smt (verit, best) Collect_cong)
-  have h5: "... = S ** {\<Uplus>\<^sub>m set ms | ms. map_seq_in ms Ms}" by metis
-  show ?thesis using h1 h2 h3 h4 by simp
+  have h3: "\<forall>M\<in>set Ms. \<forall>m\<^sub>1\<in>M. \<forall>m\<^sub>2\<in>M. dom m\<^sub>1 = dom m\<^sub>2" by (metis M1 seq_of_maps_def)
+  have h4: "card (set Ms) \<le> length Ms" by (simp add: card_length)
+  show ?thesis using h1 h2 h3 h4 unfolding map_seq_of_def by blast
+qed
+
+lemma map_add_shift: "M ** {map_add_all ms | ms. map_seq_in ms Ms} = {map_add_all ms | ms. map_seq_in ms (M#Ms)}"
+proof
+  show "M ** {map_add_all ms |ms. map_seq_in ms Ms} \<subseteq> {map_add_all ms |ms. map_seq_in ms (M # Ms)}"
+  proof
+    fix x
+    assume a1: "x \<in> M ** {map_add_all ms |ms. map_seq_in ms Ms}"
+    then obtain m ms where m1: "m \<in> M" and m2: "map_seq_in ms Ms" and m3: "x = m ++ map_add_all ms"
+      unfolding map_Add_def by blast
+    have "x = map_add_all (m#ms)" by (simp add: add_all_left m3)
+    then show "x \<in> {map_add_all ms |ms. map_seq_in ms (M # Ms)}" using m1 m2 by fastforce
+  qed
+next
+  show "{map_add_all ms |ms. map_seq_in ms (M # Ms)} \<subseteq> M ** {map_add_all ms |ms. map_seq_in ms Ms}"
+  proof
+    fix x
+    assume a1: "x \<in> {map_add_all ms |ms. map_seq_in ms (M # Ms)}"
+    then obtain m ms where m1: "m \<in> M" and m2: "map_seq_in (m#ms) (M # Ms)" and m3: "x = map_add_all (m#ms)"
+      apply (simp; clarify) by (metis map_seq_in.elims(2) map_seq_in.simps(2) map_seq_in.simps(4))
+    have h1: "map_seq_in ms Ms" using m2 by force
+    have h2: "x = m ++ map_add_all ms" by (simp add: add_all_left m3)
+    show "x \<in> M ** {map_add_all ms |ms. map_seq_in ms Ms}" 
+      unfolding map_Add_def using h1 h2 m1 by blast
+  qed
+qed
+
+lemma map_add_seq_of_shift: 
+  assumes "seq_of_maps (M#Ms)"
+  shows "M ** {map_add_all ms | ms. map_seq_of ms Ms} = {map_add_all ms | ms. map_seq_of ms (M#Ms)}"
+proof
+  show "M ** {map_add_all ms |ms. map_seq_of ms Ms} \<subseteq> {map_add_all ms |ms. map_seq_of ms (M # Ms)}"
+  proof
+    fix x
+    assume a1: "x \<in> M ** {map_add_all ms |ms. map_seq_of ms Ms}"
+    then obtain m ms where m1: "m \<in> M" and m2: "map_seq_of ms Ms" and m3: "x = m ++ map_add_all ms"
+      unfolding map_Add_def by blast
+    have h1: "x = map_add_all (m#ms)" by (simp add: add_all_left m3)
+    have h2: "map_seq_of (m#ms) (M # Ms)"
+      by (metis assms m1 m2 map_seq_in.simps(2) map_seq_of_def maps_seq_of)
+    show "x \<in> {map_add_all ms |ms. map_seq_of ms (M # Ms)}" using h1 h2 by blast
+  qed
+next
+  show "{map_add_all ms |ms. map_seq_of ms (M # Ms)} \<subseteq> M ** {map_add_all ms |ms. map_seq_of ms Ms}"
+  proof
+    fix x
+    assume a1: "x \<in> {map_add_all ms |ms. map_seq_of ms (M # Ms)}"
+    then obtain m ms where m1: "m \<in> M" and m2: "map_seq_of (m#ms) (M # Ms)" and m3: "x = map_add_all (m#ms)"
+      apply (simp; clarify) using map_seq_in.elims(2) map_seq_of_def by blast
+    have h1: "map_seq_of ms Ms" using m2
+      by (metis assms map_seq_in.simps(2) map_seq_of_def maps_seq_of seq_of_maps_hd)
+    have h2: "x = m ++ map_add_all ms" by (simp add: add_all_left m3)
+    show "x \<in> M ** {map_add_all ms |ms. map_seq_of ms Ms}"
+      using h1 h2 m1 map_Add_def by fastforce
+  qed
+qed
+
+lemma map_Add_seq_all: "seq_of_maps Ms \<Longrightarrow> map_Add_seq S Ms = S ** {map_add_all ms | ms. map_seq_of ms Ms}"
+proof (induction Ms arbitrary: S)
+  case Nil
+  have h1: "map_Add_seq S [] = S" by simp
+  have "{map_add_all ms | ms. map_seq_of ms []} = {Map.empty}"
+  proof
+    show "{map_add_all ms |ms. map_seq_of ms []} \<subseteq> {Map.empty}"
+      using map_seq_of_empty by fastforce
+  next
+    show "{Map.empty} \<subseteq> {map_add_all ms |ms. map_seq_of ms []}"
+      apply (simp add: map_add_all_def)
+      by (metis emptyE empty_set less_nat_zero_code list.size(3) map_add_seq.simps(1)
+          map_seq_in.simps(1) map_seq_of_def)
+  qed
+  hence "S = S ** {map_add_all ms | ms. map_seq_of ms []}" by (metis map_Add_unit_right)
+  then show ?case using h1 by blast
+next
+  case (Cons a Ms)
+  have h1: "map_Add_seq (S ** a) Ms = (S ** a) ** {map_add_all ms | ms. map_seq_of ms Ms}" 
+    using local.Cons seq_of_maps_hd by blast
+  have h2: "... = S ** (a ** {map_add_all ms | ms. map_seq_of ms Ms})" by (simp add: map_Add_assoc)
+  have h3: "... = S ** {map_add_all ms | ms. map_seq_of ms (a#Ms)}"
+    by (simp add: Cons.prems map_add_seq_of_shift)
+  then show ?case by (simp add: h1 h2)
+qed
+  
+
+lemma map_Add_seq_Merge: 
+  assumes "seq_of_maps Ms" 
+  shows "map_Add_seq S Ms = S ** {\<Uplus>\<^sub>m set ms | ms. map_seq_of ms Ms}"
+proof
+  show "map_Add_seq S Ms \<subseteq> S ** {\<Uplus>\<^sub>m set ms |ms. map_seq_of ms Ms}"
+  proof
+    fix x
+    assume a1: "x \<in> map_Add_seq S Ms"
+    hence h1: "x \<in> S ** {map_add_all ms | ms. map_seq_of ms Ms}" using assms map_Add_seq_all by blast
+    then obtain s ms where s1: "s \<in> S" and s2: "map_seq_of ms Ms" and s3: "x = s ++ map_add_all ms"
+      unfolding map_Add_def by blast
+    have h2: "map_add_all ms = \<Uplus>\<^sub>m set ms" using s2 add_all[of ms] unfolding map_seq_of_def
+      by (meson card_length)
+    show "x \<in> S ** {\<Uplus>\<^sub>m set ms |ms. map_seq_of ms Ms}" using h2 map_Add_def s1 s2 s3 by fastforce
+  qed
+next
+  show "S ** {\<Uplus>\<^sub>m set ms |ms. map_seq_of ms Ms} \<subseteq> map_Add_seq S Ms"
+  proof
+    fix x
+    assume a1: "x \<in> S ** {\<Uplus>\<^sub>m set ms |ms. map_seq_of ms Ms}"
+    then show "x \<in> map_Add_seq S Ms" using assms add_all map_Add_seq_all[of Ms S] unfolding map_seq_of_def
+      by (smt (verit) Collect_cong card_length)
+  qed
 qed
 
 fun map_add_seq_pair where
@@ -729,7 +886,7 @@ lemma map_add_seq_Merge_pair:
       and cN: "card N = length ns"
       and cC: "card M = card N"
     shows "map_add_seq_pair (sm, sn) (zip ms ns) = (sm ++ (\<Uplus>\<^sub>m M), sn ++ (\<Uplus>\<^sub>m N))"
-  using assms by (simp add: map_add_seq_Merge map_add_seq_zip)
+  using assms by (metis map_add_seq_Merge map_add_seq_zip nth_mem)
 
 lemma map_update_merge:
   assumes d: "a \<notin> dom m"
@@ -762,59 +919,259 @@ next
         map_add_seq.elims singleton_map_upd)
 qed
 
-lemma 
-  assumes m: "X = set xs"
-      and c: "card X = length xs"
-    shows "map_upd_seq f s xs = s ++ (\<Uplus>\<^sub>m { [x \<mapsto> f x] | x. x \<in> X })"
+lemma map_upd_Merge:
+  assumes c: "card (set xs) = length xs"
+    shows "map_upd_seq f s xs = s ++ (\<Uplus>\<^sub>m { [x \<mapsto> f x] | x. x \<in> set xs })"
 proof -
-  have h1: "\<forall>m\<^sub>1 \<in> { [x \<mapsto> f x] | x. x \<in> X }.\<forall>m\<^sub>2 \<in> { [x \<mapsto> f x] | x. x \<in> X }. m\<^sub>1 \<noteq> m\<^sub>2 \<longrightarrow> dom m\<^sub>1 \<inter> dom m\<^sub>2 = {}"
-    apply (simp add: dom_def singleton_unfold)
-    by force
-  have h2: "X = set xs \<Longrightarrow> { [x \<mapsto> f x] | x. x \<in> X } = set (map (\<lambda>a. [a \<mapsto> f a]) xs)"
-  proof (induction xs arbitrary: X)
+  have h0: "map_upd_seq f s xs = map_add_seq s (map (\<lambda>a. [a \<mapsto> f a]) xs)"
+  proof (induction xs arbitrary: s)
+    case Nil
+    then show ?case by simp
+  next
+    case (Cons a xs)
+    then show ?case using map_upd_seq_add by blast
+  qed
+  have h4: "set (map (\<lambda>a. [a \<mapsto> f a]) xs) = { [x \<mapsto> f x] | x. x \<in> set xs }"
+  proof (induction xs)
     case Nil
     then show ?case by force
   next
     case (Cons a xs)
-    then show ?case by auto
-  qed
-  have h3: "\<lbrakk> X = set xs; card X = length xs \<rbrakk> \<Longrightarrow> card { [x \<mapsto> f x] | x. x \<in> X } = length xs"
-  proof (induction xs arbitrary: X)
-    case Nil
-    then show ?case by simp 
-  next
-    case (Cons a xs)
-    hence a1: "X-{a} = set xs"
-      by (metis Diff_insert_absorb card_distinct distinct.simps(2) list.simps(15))
-    hence a2: "card (X-{a}) = length xs" 
-      by (metis Cons.prems(1) Cons.prems(2) card_distinct distinct.simps(2) distinct_card)
-    hence a3: "card { [x \<mapsto> f x] | x. x \<in> X-{a} } = length xs" using a1 by (simp add: Cons.IH)
-    have a4: "[a \<mapsto> f a] \<notin> { [x \<mapsto> f x] | x. x \<in> X-{a} }"
-      by (smt (verit, best) dom_eq_singleton_conv mem_Collect_eq member_remove remove_def)
-    have a5: "{[x \<mapsto> f x] |x. x \<in> X} = {[a \<mapsto> f a]} \<union> { [x \<mapsto> f x] | x. x \<in> X-{a} }"
+    have x1: "set (map (\<lambda>a. [a \<mapsto> f a]) (a#xs)) \<subseteq> { [x \<mapsto> f x] | x. x \<in> set (a#xs) }"
     proof
-      show "{[a \<mapsto> f a]} \<union> {[x \<mapsto> f x] |x. x \<in> X - {a}} \<subseteq> {[x \<mapsto> f x] |x. x \<in> X}"
-      proof
-        fix x
-        assume "x \<in> {[a \<mapsto> f a]} \<union> {[x \<mapsto> f x] |x. x \<in> X - {a}}"
-        then show "x \<in> {[x \<mapsto> f x] |x. x \<in> X}" apply simp using Cons.prems(1) by auto
-      qed
-    next
-      show "{[x \<mapsto> f x] |x. x \<in> X} \<subseteq> {[a \<mapsto> f a]} \<union> {[x \<mapsto> f x] |x. x \<in> X - {a}}"
-      proof
-        fix x
-        assume "x \<in> {[x \<mapsto> f x] |x. x \<in> X}"
-        then show "x \<in> {[a \<mapsto> f a]} \<union> {[x \<mapsto> f x] |x. x \<in> X - {a}}" by blast
-      qed
+      fix x
+      assume a1: "x \<in> set (map (\<lambda>a. [a \<mapsto> f a]) (a # xs))"
+      show "x \<in> {[x \<mapsto> f x] |x. x \<in> set (a # xs)}" using a1 by auto
     qed
-    have a6: "card {[x \<mapsto> f x] |x. x \<in> X} = length xs + 1" using a3 a4 apply (simp add: a5)
-      by (smt (verit) Cons.prems(1) card.infinite card.insert empty_set equals0I finite.emptyI 
-          length_greater_0_conv list.simps(15) list.size(3) mem_Collect_eq singletonD)
-    then show ?case using a1 a2 a3 a4 a5
-      by (metis One_nat_def list.size(4))
+    have x2: "{ [x \<mapsto> f x] | x. x \<in> set (a#xs) } \<subseteq> set (map (\<lambda>a. [a \<mapsto> f a]) (a#xs))"
+    proof
+      fix x
+      assume a1: "x \<in> {[x \<mapsto> f x] |x. x \<in> set (a # xs)}"
+      show "x \<in> set (map (\<lambda>a. [a \<mapsto> f a]) (a # xs))" using a1 by auto
+    qed
+    show ?case using x1 x2 by blast
   qed
-  show ?thesis 
-    by (smt (verit) c h1 h2 h3 length_map m map_add_seq_Merge map_eq_conv map_upd_seq_add)  
+  obtain ms where ms1: "ms = map (\<lambda>a. [a \<mapsto> f a]) xs" by blast
+  have h1: "\<forall>i j. i < length ms \<and> j < length ms \<and> dom (ms!i) \<inter> dom (ms!j) \<noteq> {} \<longrightarrow> i = j"
+    using c apply (simp add: ms1 singleton_unfold; clarify)
+    by (smt (verit, best) card_distinct disjoint_iff domIff nth_eq_iff_index_eq nth_map)
+  hence h2: "map_add_seq s ms = s ++ (\<Uplus>\<^sub>m set ms)" by (simp add: map_add_seq_Merge)
+  hence h3: "... = s ++ (\<Uplus>\<^sub>m { [x \<mapsto> f x] | x. x \<in> set xs })" using h4 ms1 by presburger
+  show ?thesis using h0 h2 h4 ms1 by auto    
 qed
-*)
+
+fun map_Upd_seq where
+  "map_Upd_seq f S [] = S"
+| "map_Upd_seq f S (m#ms) = map_Upd_seq f { s(m\<mapsto>x) |s x. s \<in> S \<and> x \<in> f m } ms"
+
+definition maps_of where "maps_of f x = { [x \<mapsto> y] | y. y \<in> f x }"
+
+lemma map_maps_hd: "map (maps_of f) (x#xs) = { [x \<mapsto> y] | y. y \<in> f x }#map (maps_of f) xs"
+  by (simp add: maps_of_def)
+
+lemma Dom_maps_of:"Dom (\<Union> (set (map (maps_of f) xs))) \<subseteq> set xs"
+proof (induction xs)
+  case Nil
+  then show ?case unfolding Dom_def dom_def maps_of_def by (simp; clarify)
+next
+  case (Cons a xs)
+  then show ?case unfolding Dom_def dom_def maps_of_def apply simp by fastforce
+qed
+
+lemma Dom_maps_of_inner:"\<forall>x \<in> set xs. f x \<noteq> {} \<Longrightarrow> Dom (\<Union> (set (map (maps_of f) xs))) = set xs"
+proof (induction xs)
+  case Nil
+  then show ?case using Dom_def by fastforce
+next
+  case (Cons a xs)
+  have h1: "Dom (\<Union> (set (map (maps_of f) xs))) = set xs" using Cons.IH Cons.prems by force
+  have h2: "Dom (\<Union> (set (map (maps_of f) (a # xs)))) = 
+      Dom (\<Union> (set ({ [a \<mapsto> y] | y. y \<in> f a }#map (maps_of f) xs)))"
+    by (metis map_maps_hd)
+  have h3: "... = Dom (\<Union> ({{ [a \<mapsto> y] | y. y \<in> f a }} \<union> set (map (maps_of f) xs)))" by force
+  have h4: "... = Dom ({ [a \<mapsto> y] | y. y \<in> f a } \<union> \<Union> (set (map (maps_of f) xs)))" by force
+  have h5: "... = {a} \<union> Dom (\<Union> (set (map (maps_of f) xs)))" 
+    unfolding Dom_def dom_def apply simp apply (rule antisym)
+    using SUP_le_iff apply fastforce
+    apply (simp; clarify)
+    by (metis Cons.prems ex_in_conv fun_upd_same list.set_intros(1))
+  then show ?case using h1 h2 by force
+qed
+
+lemma Dom_maps_of_outer:"\<lbrakk> \<forall>x \<in> set xs. f x \<noteq> {}; k < length xs \<rbrakk> \<Longrightarrow> Dom ((map (maps_of f) xs)!k) \<subseteq> set xs"
+proof (induction xs arbitrary: k)
+  case Nil
+  then show ?case by simp
+next
+  case (Cons a xs)
+    then show ?case
+    proof (cases "k = 0")
+      case True
+      have h1: "Dom (map (maps_of f) (a # xs) ! k) = Dom (({ [a \<mapsto> y] | y. y \<in> f a }#map (maps_of f) xs) ! k)"
+        by (metis map_maps_hd)
+      have h2: "... = Dom ({ [a \<mapsto> y] | y. y \<in> f a })" by (simp add: True)
+      have h3: "... = {a}" using Cons.prems(1) by (simp add: Dom_single ex_in_conv)
+      then show ?thesis using h1 h2 by force
+    next
+      case False
+      have h1: "Dom (map (maps_of f) (a # xs) ! k) = Dom (({ [a \<mapsto> y] | y. y \<in> f a }#map (maps_of f) xs) ! k)"
+        by (metis map_maps_hd)
+      have h2: "... = Dom ((map (maps_of f) xs) ! (k-1))"
+        by (simp add: False zero_less_iff_neq_zero)
+      then show ?thesis
+        using Cons.IH Cons.prems(1) Cons.prems(2) False apply (simp; clarify)
+        by (metis Suc_less_eq Suc_pred subsetD)
+    qed
+qed
+
+lemma Dom_maps_of_diff:"\<lbrakk> card (set xs) = length xs; \<forall>x \<in> set xs. f x \<noteq> {}; i < length xs; j < length xs; 
+  i \<noteq> j \<rbrakk> \<Longrightarrow> Dom ((map (maps_of f) xs)!i) \<inter> Dom ((map (maps_of f) xs)!j) = {}"
+proof (induction xs arbitrary: i j)
+  case Nil
+  then show ?case
+    by simp
+next
+  case (Cons a xs)
+  then show ?case
+  proof (cases "i = 0")
+    case True
+    hence h1: "Dom (map (maps_of f) (a # xs) ! i) = {a}"
+      unfolding Dom_def dom_def maps_of_def apply simp apply (rule antisym)
+      apply clarify 
+       apply (metis option.distinct(1) singleton_unfold)
+      apply clarify using Cons.prems(2) by auto
+    have h2: "j > 0" using Cons.prems(5) True by force
+    hence h3: "Dom (map (maps_of f) (a # xs) ! j) = Dom (({ [a \<mapsto> y] | y. y \<in> f a }#map (maps_of f) xs) ! j)"
+      by simp
+    have h4: "... = Dom (map (maps_of f) xs ! (j-1))" using h2 by force
+    have h5: "... \<subseteq> set xs"
+      using h2
+      by (metis Cons.prems(2) Cons.prems(4) Dom_maps_of_outer One_nat_def Suc_less_eq Suc_pred 
+          length_Cons set_subset_Cons subsetD)
+    then show ?thesis
+      by (metis Cons.prems(1) Int_insert_left_if0 card_distinct distinct.simps(2) h1 h3 h4 
+          inf_bot_left subsetD)
+  next
+    case False
+    hence h0: "i > 0" by simp
+    then show ?thesis
+    proof (cases "j = 0")
+      case True
+    hence h1: "Dom (map (maps_of f) (a # xs) ! j) = {a}"
+      unfolding Dom_def dom_def maps_of_def apply simp apply (rule antisym)
+      apply clarify 
+       apply (metis option.distinct(1) singleton_unfold)
+      apply clarify using Cons.prems(2) by auto
+    have h2: "Dom (map (maps_of f) (a # xs) ! i) = Dom (({ [a \<mapsto> y] | y. y \<in> f a }#map (maps_of f) xs) ! i)"
+      by (metis map_maps_hd)
+    have h4: "... = Dom (map (maps_of f) xs ! (i-1))" using h1 False by force
+    have h5: "... \<subseteq> set xs"
+      by (metis Cons.prems(2) Cons.prems(3) Dom_maps_of_outer False One_nat_def Suc_less_eq 
+          Suc_pred bot_nat_0.not_eq_extremum length_Cons set_subset_Cons subset_iff)
+      then show ?thesis
+        by (metis Cons.prems(1) Int_insert_right card_distinct distinct.simps(2) h1 h2 h4 inf_bot_right subsetD)
+    next
+      case False
+      have h6: "Dom (map (maps_of f) (a # xs) ! i) = Dom (({ [a \<mapsto> y] | y. y \<in> f a }#map (maps_of f) xs) ! i)"
+        by (simp add: maps_of_def)
+      have i6: "... = Dom (map (maps_of f) xs ! (i-1))" by (simp add: h0)
+      have h7: "Dom (map (maps_of f) (a # xs) ! j) = Dom (({ [a \<mapsto> y] | y. y \<in> f a }#map (maps_of f) xs) ! j)"
+        by (simp add: maps_of_def)
+      have i7: "... = Dom (map (maps_of f) xs ! (j-1))" by (simp add: False zero_less_iff_neq_zero)
+      have x1: "i-1 < length xs" using Cons.prems(3) h0 by auto
+      have x2: "j-1 < length xs" using Cons.prems(4) False by force
+      have x3: "i-1 \<noteq> j-1" by (metis Cons.prems(5) False Suc_pred' gr_zeroI h0)
+      have x4: "Dom (map (maps_of f) xs ! (i-1)) \<inter> Dom (map (maps_of f) xs ! (j-1)) = {}"
+        by (metis Cons.IH Cons.prems(1) Cons.prems(2) card_distinct distinct.simps(2) distinct_card 
+            list.set_intros(2) x1 x2 x3)
+      then show ?thesis using h6 h7 i6 i7 by blast
+    qed
+  qed
+qed
+
+lemma map_Upd_Add:
+  assumes c: "card (set xs) = length xs"
+  shows "map_Upd_seq f S xs = map_Add_seq S (map (maps_of f) xs)"
+proof (induction xs arbitrary: S)
+  case Nil
+  then show ?case by simp
+next
+  case (Cons a xs)
+  have h1: "map_Upd_seq f (S ** { [a \<mapsto> y] | y. y \<in> f a }) xs = 
+        map_Add_seq (S ** { [a \<mapsto> y] | y. y \<in> f a }) (map (maps_of f) xs)" using local.Cons by blast
+  have h2: "map_Upd_seq f S (a # xs) = map_Upd_seq f { s(a\<mapsto>y) |s y. s \<in> S \<and> y \<in> f a } xs" by simp
+  have h3: "{ s(a\<mapsto>y) |s y. s \<in> S \<and> y \<in> f a } = S ** { [a \<mapsto> y] | y. y \<in> f a }"
+  proof
+    show "{s(a \<mapsto> y) |s y. s \<in> S \<and> y \<in> f a} \<subseteq> S ** {[a \<mapsto> y] |y. y \<in> f a}"
+      apply (simp add: map_Add_def; clarify) by force
+  next 
+    show "S ** {[a \<mapsto> y] |y. y \<in> f a} \<subseteq> {s(a \<mapsto> y) |s y. s \<in> S \<and> y \<in> f a}" 
+      apply (simp add: map_Add_def; clarify) by auto
+  qed
+  have h4: "map_Add_seq (S ** { [a \<mapsto> y] | y. y \<in> f a }) (map (maps_of f) xs) = 
+        map_Add_seq S (map (maps_of f) (a # xs))" 
+    by (simp add: maps_of_def)
+  then show ?case using h1 h2 h3 by presburger
+qed
+
+lemma "\<lbrakk> k < length xs; x \<notin> set xs \<rbrakk> \<Longrightarrow> x \<notin> Dom (map (maps_of f) xs ! k)"
+proof (induction xs arbitrary: k)
+  case Nil
+  then show ?case
+    unfolding Dom_def dom_def by fastforce
+next
+  case (Cons a xs)
+  have k1: "k = 0 \<Longrightarrow> Dom (map (maps_of f) (a # xs) ! k) \<subseteq> {a}" 
+    apply (simp add: map_maps_hd[of f a xs] maps_of_def Dom_def dom_def; clarify)
+    by (metis domI domIff singleton_unfold)
+  have k2: "k \<noteq> 0 \<Longrightarrow> Dom (map (maps_of f) (a # xs) ! k) \<subseteq> Dom (map (maps_of f) xs ! (k-1))" by auto
+  show ?case using Cons.IH Cons.prems(1) Cons.prems(2) k1 k2
+    apply (simp; clarify) 
+    using less_Suc_eq_0_disj by auto
+qed
+
+lemma seq_of_map_maps: 
+  "\<lbrakk>card (set xs) = length xs; \<forall>x \<in> set xs. f x \<noteq> {}\<rbrakk> \<Longrightarrow> seq_of_maps (map (maps_of f) xs)"
+proof (induction xs)
+  case Nil
+  then show ?case by (simp add: seq_of_maps_def)
+next
+  case (Cons a xs)
+  have h1: "seq_of_maps (map (maps_of f) xs)"
+    by (meson Cons.IH Cons.prems(1) Cons.prems(2) card_distinct distinct.simps(2) distinct_card 
+        list.set_intros(2))
+  have h2: "\<forall>i j. i < length (map (maps_of f) (a # xs)) \<and> j < length (map (maps_of f) (a # xs)) \<and> 
+      Dom ((map (maps_of f) (a # xs))!i) \<inter> Dom ((map (maps_of f) (a # xs))!j) \<noteq> {} \<longrightarrow> i = j" 
+    using Dom_maps_of_diff by (metis Cons.prems(1) Cons.prems(2) length_map)
+  have h3: "\<forall>M \<in> set (map (maps_of f) (a # xs)).\<forall>m\<^sub>1 \<in> M.\<forall>m\<^sub>2 \<in> M. dom m\<^sub>1 = dom m\<^sub>2"
+    using h1 unfolding maps_of_def seq_of_maps_def apply clarify by fastforce
+  then show ?case by (metis h2 seq_of_maps_def)
+qed
+
+lemma map_Upd_Merge:
+  assumes c: "card (set xs) = length xs"
+  assumes f: "\<forall>x \<in> set xs. f x \<noteq> {}"
+  shows "map_Upd_seq f S xs = S ** {\<Uplus>\<^sub>m set ms |ms. map_seq_in ms (map (maps_of f) xs) }"
+proof
+  show "map_Upd_seq f S xs \<subseteq> S ** {\<Uplus>\<^sub>m set ms |ms. map_seq_in ms (map (maps_of f) xs)}" 
+  proof
+    fix x
+    assume a1: "x \<in> map_Upd_seq f S xs"
+    hence h1: "x \<in> map_Add_seq S (map (maps_of f) xs)" using c map_Upd_Add by blast
+    have h2: "seq_of_maps (map (maps_of f) xs)" using c f seq_of_map_maps by blast
+    hence h2: "x \<in> S ** {\<Uplus>\<^sub>m set ms | ms. map_seq_of ms (map (maps_of f) xs)}"
+      using h1 map_Add_seq_Merge by blast
+    show "x \<in> S ** {\<Uplus>\<^sub>m set ms |ms. map_seq_in ms (map (maps_of f) xs)}"
+      using c f h2 map_seq_of_wk[of _ "map (maps_of f) xs"] 
+        maps_seq_of[of "map (maps_of f) xs"] seq_of_map_maps[of xs f]
+      by (smt (verit, best) Collect_cong)
+  qed
+next
+  show "S ** {\<Uplus>\<^sub>m set ms |ms. map_seq_in ms (map (maps_of f) xs)} \<subseteq> map_Upd_seq f S xs"
+    using c f map_Upd_Add[of xs f S] map_seq_of_wk[of _ "map (maps_of f) xs"] 
+      maps_seq_of[of "map (maps_of f) xs"] seq_of_map_maps[of xs f] 
+    map_Add_seq_Merge[of "map (maps_of f) xs" S] apply clarify
+    by (smt (z3) CollectD CollectI map_Add_def)
+qed
+
 end
