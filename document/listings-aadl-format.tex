@@ -1,0 +1,122 @@
+\definecolor{commentcolor}{gray}{0.6}
+\definecolor{codebackgroundcolor}{rgb}{0.97,0.99,0.94}
+\definecolor{paragraphnumbercolor}{rgb}{0.99,0.60,0.60}
+\definecolor{jpcolor}{rgb}{0.2,0.0,0.8}
+\definecolor{bacolor}{rgb}{0.0,0.5,0.0}
+\definecolor{reconciliationcolor}{rgb}{0.2,0.6,0.2}
+\definecolor{notbacolor}{rgb}{0.5,0.0,0.0}
+
+\newcommand{\lstbasicstyle}
+  %{\linespread{1.9}\ttfamily\listingsize}
+  {\ttfamily\scriptsize}
+
+%define a language for listings
+\lstdefinelanguage{bless}
+  { morekeywords=[2]{ %AADL keywords
+    aadlboolean,aadlinteger,aadlreal,aadlstring,
+    abstract,access,and,annex,applies,binding,bus,
+    calls,classifier,compute,connections,constant,data,delta,device,
+    end,enumeration,event,extends,false,feature,features,flow,
+    flows,group,implementation,in,inherit,inverse,is,
+    list,memory, mod,mode,modes,none,not,of,or,
+    out,package,parameter,path,port,private,process,processor,
+    properties,property,prototypes,provides,public, %range,
+    reference,
+    refined,rem,renames,requires,self,set,sink,source,subcomponents,
+    subprogram,system,thread,to,true,type,units,virtual,with,
+    stop,abort},
+  morekeywords=[1]{ %GUMBO keywords
+    assume,case,cases,guarantee,handle,initialize,integration,invariants,inv,modifies,state},
+  morekeywords=[1]{ %BLESS keywords
+    assert,declare,
+    availability,while,forall,exists,that,are,numberof,dispatch,sticky,all,
+    aperiodic,sporadic,timed,hybrid,xor,implies,iff,sum,product,
+    now,variables,if,fi,skip,invariant,bound,cand,cor,null,timeout,states,
+    persistent,shared,transitions,computation,delay,
+    initial,complete,final,state,count,fresh,on,
+    BLESS,Action,Assertion,pre,post,for,  %subBLESS,
+    variant,record,array,do,until,boolean,tops,
+    shared,spread,fetchadd,fetchand,fetchor,fetchxor,swap,
+    def,integer,natural,rational,real,complex,time,
+    Typed,Invariant,Precondition,Postcondition,
+%   BLESS_Properties,BLESS_Types,
+    otherwise,then,else,elsif,abs,
+    updated,frozen,always,never,pause,error,propagations,behavior,
+    use,types,events},
+  sensitive=true,
+  morecomment=[l]{--},
+  columns=[r]fixed,
+  basicstyle=\lstbasicstyle,
+  tabsize=2,
+  otherkeywords={
+    <, <=, ==, >, >=, &, &&, |, ||, !, ->:, ~>:, ~~>:
+    <<,>>,&,??,@,',[,],^,:,+=,\{**,**\},->,
+    =>,?,!,+=>,:=,
+    *!<,*!>,!<,!>, %-[,]->,
+    ~>,(,)
+    }
+  }
+
+\lstdefinelanguage{slang}
+{ morekeywords=[1]{ %SLANG keywords
+    Option,None,Some,Unit,
+    class,def,return,
+    @datatype,@record,@spec,
+    Contract,Ensures,Invariant,Modifies,Requires,Res,
+  },
+  sensitive=true,
+  morecomment=[l]{//},
+  columns=[r]fixed,
+  basicstyle=\lstbasicstyle,
+  tabsize=2,
+  otherkeywords={
+    <, <=, ==, >, >=, &, &&, |, ||, !, ->:, -->:
+  }  
+}
+
+%\definecolor{commentcolor}{gray}{0.6}
+%\definecolor{codebackgroundcolor}{rgb}{0.98,0.99,0.95}
+
+\lstset{language=bless,
+%    basicstyle=\tiny,
+  keywordstyle={\bfseries\color{blue}},  %BLESS identifiers and symbols
+  keywordstyle={[2]\bfseries\color{red}}, %AADL identifiers
+  commentstyle={\itshape\color{commentcolor}},  %comments
+  frame=tb, %single,
+  frameround=tttt,
+  backgroundcolor= \color{codebackgroundcolor},
+% lineskip=-3pt,
+% escapechar=\#,  %use to insert some LaTeX command in the listing
+% numbers=left
+  }
+
+
+
+%LINE NUMBERS  4/18/2010
+%turn line numbers on
+\newcommand{\turnlinenumberson}
+{\lstset{language=bless,
+  keywordstyle={\bfseries\color{blue}},  %BLESS identifiers and symbols
+  keywordstyle={[2]\bfseries\color{red}}, %AADL identifiers
+  commentstyle={\itshape\color{commentcolor}},  %comments
+  frame=single,
+  frameround=tttt,
+  backgroundcolor= \color{codebackgroundcolor},
+  lineskip=-1pt,
+  numbers=left
+  }
+} %end of \turnlinenumberson
+
+%turn line numbers off
+\newcommand{\turnlinenumbersoff}
+{\lstset{language=bless,
+  keywordstyle={\bfseries\color{blue}},  %BLESS identifiers and symbols
+  keywordstyle={[2]\bfseries\color{red}}, %AADL identifiers
+  commentstyle={\itshape\color{commentcolor}},  %comments
+  frame=single,
+  frameround=tttt,
+  backgroundcolor= \color{codebackgroundcolor},
+  lineskip=-1pt,
+  numbers=none
+  }
+} %end of \turnlinenumbersoff

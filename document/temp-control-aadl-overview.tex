@@ -1,0 +1,72 @@
+\input{listings-aadl-format}
+
+\subsection{AADL Model Overview}
+
+\begin{figure*}[htbp]
+%  \vspace*{-.2cm}
+  \centerline{\includegraphics[width=16cm]{temp-control-graphical.png}}
+%  \vspace*{-.3cm}
+  \caption{Temperature Control Example -- AADL Graphical View}
+%  \vspace*{-.3cm}
+  \label{fig:temp-control-graphical}
+\end{figure*}
+
+Figure~\ref{fig:temp-control-graphical} presents the AADL graphical
+view for a simple temperature control system that maintains a
+temperature according to a set point containing high and low bounds
+for the target temperature.
+The periodic \texttt{tempSensor} thread measures the temperature and
+transmits the reading on its \texttt{currentTemp} data port.  It sends
+a notification on its \texttt{tempChanged} event port if it detects
+that the temperature has changed since the last reading.  When the
+sporadic (event-driven) \texttt{tempControl} thread receives a
+\texttt{tempChanged} event, it reads the value on its
+\texttt{currentTemp} data port and compares it with the most recent
+set point.  If the current temperature exceeds the high set point or 
+drops below the low set point, the fan is turned on or off respectively. 
+In turn, the fan acknowledges these commands.
+%% sends a \texttt{FanCmd.On} command to cool the temperature.
+
+%% Similar
+%% logic will result in \texttt{FanCmd.Off} being sent if the current
+%% temperature is below the low set point.  In either case, the
+%% \texttt{fan} acknowledges whether it was able to fulfill the command
+%% by sending \texttt{FanAck.Ok} or \texttt{FanAck.Error} on its
+%% \texttt{fanAck} event data port.
+
+\begin{figure}[htbp]
+\begin{lstlisting}[
+  language=bless
+  ]
+thread TempControl
+  features
+  -- ==== INPUTS ==== 
+    currentTemp: in data port TempSensor::Temperature.i;
+    tempChanged: in event port;
+    fanAck: in event data port CoolingFan::FanAck;
+    setPoint: in event data port SetPoint.i;
+    -- ==== OUTPUTS ==== 
+    fanCmd: out event data port CoolingFan::FanCmd;
+  properties
+    Dispatch_Protocol => Sporadic;
+    Period => 1 sec;
+end TempControl    
+\end{lstlisting}
+\caption{Temperature Control Thread -- AADL Textual View}
+\label{fig:temp-control-thread-textual}
+\end{figure}
+
+AADL's textual view for the component type definition of the \texttt{TempControl}
+thread is shown in Figure~\ref{fig:temp-control-thread-textual}.
+Because \texttt{TempControl} is event-triggered, it will be dispatched
+by arrival of events on any of the \texttt{tempChanged}, \texttt{fanAck}, 
+\texttt{setPoint} ports.  Most interesting for us is the dispatching on the 
+arrival of the \texttt{tempChanged} event.  In this case, the 
+thread application logic will read the \texttt{currentTemp} data port, 
+compare the value to the most recent \texttt{setPoint} values, and
+compute an appropriate state for the fan, sending an on/off command
+over the \texttt{fanCmd} port if necessary.
+
+
+
+
