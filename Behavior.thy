@@ -164,12 +164,14 @@ proof -
         s' = s\<lparr>systemThread := (systemThread s)(c\<mapsto>t), systemExec := Initialize cs\<rparr> \<and>
         isInitializing s \<and>
         Initialize (x # xs) = Initialize (c # cs) \<and> stepInit (appModelApp am $ c) (systemThread s $ c) t"
-    using exec step apply (simp add: stepSys.simps)
+    using exec step by (simp add: stepSys.simps)
+(* old proof
     apply (erule disjE)
      apply blast
     apply (erule disjE)
     using init apply force
     using init by force
+*)
   then obtain c cs t 
     where h1: "s' = s\<lparr>systemThread := (systemThread s)(c\<mapsto>t), systemExec := Initialize cs\<rparr>"
       and h2: "systemPhase s = Initializing"
@@ -192,12 +194,14 @@ proof -
         s' = s\<lparr>systemThread := (systemThread s)(c\<mapsto>t), systemExec := Initialize cs\<rparr> \<and>
         isInitializing s \<and>
         Initialize (x # xs) = Initialize (c # cs) \<and> stepInit (appModelApp am $ c) (systemThread s $ c) t"
-    using exec step apply (simp add: stepSys.simps)
+    using exec step by (simp add: stepSys.simps)
+(* old proof
     apply (erule disjE)
      apply blast
     apply (erule disjE)
     using init apply force
     using init by force
+*)
   then obtain c cs t 
     where h1: "s' = s\<lparr>systemThread := (systemThread s)(c\<mapsto>t), systemExec := Initialize cs\<rparr>"
       and h2: "systemPhase s = Initializing"
@@ -208,7 +212,6 @@ proof -
     using exec h1 h3 by fastforce
 qed
   
-
 lemma stepSysInit_initInv_ruleinv:
   assumes init: "isInitializing s"
       and exec: "systemExec s = Initialize (x # xs)"
@@ -219,12 +222,14 @@ proof -
         s' = s\<lparr>systemThread := (systemThread s)(c\<mapsto>t), systemExec := Initialize cs\<rparr> \<and>
         isInitializing s \<and>
         Initialize (x # xs) = Initialize (c # cs) \<and> stepInit (appModelApp am $ c) (systemThread s $ c) t"
-    using exec step apply (simp add: stepSys.simps)
+    using exec step by (simp add: stepSys.simps)
+(*
     apply (erule disjE)
      apply blast
     apply (erule disjE)
     using init apply force
     using init by force
+*)
   then obtain c cs t 
     where h1: "s' = s\<lparr>systemThread := (systemThread s)(c\<mapsto>t), systemExec := Initialize cs\<rparr>"
       and h2: "systemPhase s = Initializing"
@@ -233,6 +238,26 @@ proof -
     using exec isInitializing.elims by blast
   show ?thesis 
     by (simp add: h1 h2)
+qed
+
+  
+lemma stepSysInit_sc_rev_ruleinv:
+  "\<lbrakk>stepSys am cm sc s s'; systemExec s' = Initialize xs\<rbrakk> \<Longrightarrow> \<exists>x. systemExec s = Initialize (x # xs)"
+proof (induction rule: stepSys.induct)
+  case (initialize c cs t)
+  then show ?case by force
+next
+  case (switch c)
+  then show ?case by simp
+next
+  case (push c t sb it)
+  then show ?case by simp
+next
+  case (pull c t sb it)
+  then show ?case by simp
+next
+  case (execute c c' a t)
+  then show ?case by simp
 qed
 
 (* Transitive closure of steps; no traces *)

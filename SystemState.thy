@@ -151,10 +151,10 @@ phase of the system.
 \<close>
 
 fun isInitializing :: "('a, 'u) SystemState \<Rightarrow> bool"
-  where "isInitializing s = (systemPhase s = Initializing)"
+  where "isInitializing s = (systemPhase s = Initializing \<and> (\<exists>cs. systemExec s = Initialize cs))"
 
 fun isComputing :: "('a, 'u) SystemState \<Rightarrow> bool"
-  where "isComputing s = (systemPhase s = Computing)"
+  where "isComputing s = (systemPhase s = Computing \<and> (\<exists>c. systemExec s = Compute c))"
 
 (* Should we move the communication definitions into their own theory? *)
 

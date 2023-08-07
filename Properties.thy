@@ -77,97 +77,262 @@ qed
 text \<open>The follow definition will interpret a system initialization property
 @{term P} in the context of a specific system state @{term s}.\<close>
 
-definition sysAllInitProp :: 
-  "   'a AppModel 
-   \<Rightarrow> (CompId \<Rightarrow> ('a VarState * 'a PortState \<Rightarrow> bool)) 
-   => ('u, 'a) SystemState \<Rightarrow> bool"
-  where "sysAllInitProp am P s \<equiv>
+definition sysAllInitProp :: "'a AppModel \<Rightarrow> 
+  (CompId \<Rightarrow> ('a VarState * 'a PortState \<Rightarrow> bool)) \<Rightarrow> 
+  ('u, 'a) SystemState \<Rightarrow> bool"
+where "sysAllInitProp am P s \<equiv>
   \<forall>c \<in> appModelCIDs am. P c (tvar (systemThread s $ c), appo (systemThread s $ c))"
 
 definition systemAppInit where "systemAppInit am c = { (v, p) | v p. appModelInit am c v p }"
 
-(* work in progress
-definition varappo where "varappo x c = (tvar (systemThread x $ c), appo (systemThread x $ c))"
+definition varappo where "varappo x c = 
+  (if c \<in> dom (systemThread x) 
+    then Some (tvar (systemThread x $ c), appo (systemThread x $ c)) 
+    else None)"
+
+lemma varappo_te:
+  assumes "c \<in> dom(systemThread x)"
+  shows "varappo (x\<lparr>systemThread := 
+    systemThread x(c \<mapsto> (systemThread x $ c)\<lparr>tvar := vs, appo := ps\<rparr>), systemExec := e\<rparr>) c = 
+    Some (vs, ps)"
+proof -
+  have h1: "tvar(systemThread x(c \<mapsto> (systemThread x $ c)\<lparr>tvar := vs, appo := ps\<rparr>) $ c) = vs"
+    by simp
+  have h2: "appo(systemThread x(c \<mapsto> (systemThread x $ c)\<lparr>tvar := vs, appo := ps\<rparr>) $ c) = ps"
+    by simp
+  show ?thesis unfolding varappo_def by simp
+qed
+
+lemma sysInit_bw:
+  shows "\<lbrakk>stepSys am com sch x y; systemExec y = Initialize cs \<rbrakk> \<Longrightarrow> systemExec x \<noteq> Initialize []"
+proof (induction rule: stepSys.induct)
+  case (initialize c cs t)
+  then show ?case by simp
+next
+  case (switch c)
+  then show ?case by simp
+next
+  case (push c t sb it)
+  then show ?case by force
+next
+  case (pull c t sb it)
+  then show ?case by simp
+next
+  case (execute c c' a t)
+  then show ?case by simp
+qed
+
+lemma sysInit_seq_bw_neq:
+  "\<lbrakk>(stepSys am com sch)\<^sup>*\<^sup>* x y; x \<noteq> y; systemExec y = Initialize cs \<rbrakk> \<Longrightarrow> systemExec x \<noteq> Initialize []"
+proof (induction arbitrary: cs rule: rtranclp.induct)
+  case (rtrancl_refl a)
+  then show ?case by blast
+next
+  case (rtrancl_into_rtrancl a b c)
+  have h1: "(stepSys am com sch)\<^sup>*\<^sup>* a b" using rtrancl_into_rtrancl.hyps(1) by blast
+  have h2: "stepSys am com sch b c" using rtrancl_into_rtrancl.hyps(2) by blast
+  have h3: "\<And>cs. a \<noteq> b \<Longrightarrow> systemExec b = Initialize cs \<Longrightarrow> systemExec a \<noteq> Initialize []"
+    using rtrancl_into_rtrancl.IH by blast
+  have h4: "a \<noteq> c" by (simp add: rtrancl_into_rtrancl.prems(1))
+  have h5: "systemExec c = Initialize cs" using rtrancl_into_rtrancl.prems(2) by blast
+  show ?case 
+  proof (cases "a = b")
+    case True
+    then show ?thesis
+      using rtrancl_into_rtrancl.hyps(2) rtrancl_into_rtrancl.prems(2) sysInit_bw by blast
+  next
+    case False
+    then obtain cs' where "systemExec b = Initialize cs'" 
+      using h2 h5 stepSysInit_sc_rev_ruleinv by blast
+    then show ?thesis using False h3 by blast
+  qed
+qed
+
+lemma sysInit_seq_bw_supseq:
+  "\<lbrakk>(stepSys am com sch)\<^sup>*\<^sup>* x y; systemExec y = Initialize cs \<rbrakk> \<Longrightarrow> (\<exists>as. systemExec x = Initialize (as @ cs))"
+proof (induction arbitrary: cs rule: rtranclp.induct)
+  case (rtrancl_refl a)
+  then show ?case by simp
+next
+  case (rtrancl_into_rtrancl a b c)
+  then show ?case
+    by (metis append.assoc append_Cons append_Nil stepSysInit_sc_rev_ruleinv)
+qed
+
+lemma sysInit_none:
+  "\<lbrakk>stepSys am com sch x y; systemExec y = Initialize cs; systemExec x = Initialize cs \<rbrakk> \<Longrightarrow> x = y"
+  using stepSysInit_sc_rev_ruleinv by fastforce
+
+lemma sysInit_seq_none:
+  "\<lbrakk>(stepSys am com sch)\<^sup>*\<^sup>* x y; systemExec y = Initialize cs; systemExec x = Initialize cs \<rbrakk> \<Longrightarrow> x = y"
+proof (induction rule: rtranclp.induct)
+  case (rtrancl_refl a)
+  then show ?case by simp
+next
+  case (rtrancl_into_rtrancl a b c)
+  obtain u where "systemExec b = Initialize (u#cs)"
+    using rtrancl_into_rtrancl.hyps(2) rtrancl_into_rtrancl.prems(1) stepSysInit_sc_rev_ruleinv by blast
+  then show ?case
+    using rtrancl_into_rtrancl.hyps(1) rtrancl_into_rtrancl.prems(2) sysInit_seq_bw_supseq by fastforce
+qed
+
+lemma sysInit_step_seq_set: 
+  "\<lbrakk> stepSys am com sch x y; 
+     isInitializing x;
+     systemExec x = Initialize (c # cs) \<rbrakk> \<Longrightarrow> varappo y \<in> { (varappo x)(c\<mapsto>v) |v. v \<in> systemAppInit am c }"
+proof (induction rule: stepSys.induct)
+  case (initialize a cs t)
+  have h1: "a = c" using initialize.hyps(2) initialize.prems(2) by fastforce
+  then obtain vs ps where 
+    h2: "varappo (x\<lparr>systemThread := systemThread x(a \<mapsto> t), systemExec := Initialize cs\<rparr>) c = Some (vs, ps)"
+    using varappo_def
+    by (metis SystemState.SystemState.select_convs(1) SystemState.SystemState.surjective 
+        SystemState.SystemState.update_convs(1) SystemState.SystemState.update_convs(5) domI fun_upd_same)
+  hence h3: "(vs, ps) \<in> systemAppInit am c" unfolding systemAppInit_def varappo_def apply clarify
+    using h1 initialize.hyps(3) stepInit_ruleinv by fastforce
+  have h4: "varappo (x\<lparr>systemThread := systemThread x(a \<mapsto> t), systemExec := Initialize cs\<rparr>) = varappo x(c \<mapsto> (vs, ps))"
+  proof
+    fix z
+    show "varappo (x\<lparr>systemThread := systemThread x(a \<mapsto> t), systemExec := Initialize cs\<rparr>) z =
+          (varappo x(c \<mapsto> (vs, ps))) z"
+    proof (cases "z = c")
+      case True
+      then show ?thesis
+        by (simp add: h2)
+    next
+      case False
+      then show ?thesis by (simp add: h1 varappo_def)
+    qed
+  qed
+  show ?case using initialize.prems h2 h3 using h1 h4 by fastforce
+next
+  case (switch c)
+  then show ?case by simp
+next
+  case (push c t sb it)
+  then show ?case by simp
+next
+  case (pull c t sb it)
+  then show ?case by simp
+next
+  case (execute c c' a t)
+  then show ?case by simp
+qed
+
+lemma sysInit_step_seq: 
+  "\<lbrakk> stepSys am com sch x y; 
+     systemExec x = Initialize (c # cs) \<rbrakk> \<Longrightarrow> varappo y \<in> map_Upd_seq (systemAppInit am) {varappo x} [c]"
+proof (induction rule: stepSys.induct)
+  case (initialize a as t)
+  have h1: "a = c" using initialize.hyps(2) initialize.prems(1) by fastforce
+  have h2: "as = cs" using initialize.hyps(2) initialize.prems(1) by fastforce
+  have h3: "map_Upd_seq (systemAppInit am) {varappo x} [c] = { (varappo x)(c\<mapsto>v) |v. v \<in> systemAppInit am c }"
+    by simp
+  then show ?case apply (simp add: h3) 
+    using h1 initialize.hyps stepSys.initialize sysInit_step_seq_set by fastforce
+next
+  case (switch c)
+  then show ?case by simp
+next
+  case (push c t sb it)
+  then show ?case by simp
+next
+  case (pull c t sb it)
+  then show ?case by simp
+next
+  case (execute c c' a t)
+  then show ?case by simp
+qed
 
 lemma sysInit_seq:
-  assumes wf_am: "wf_AppModel am"
-      and init: "isInitializing x"
-      and step: "stepsSys am com sch x y"
-      and exec_x: "systemExec x = Initialize (scheduleInit sch)"
-      and exec_y: "systemExec y = Initialize []"
-    shows "varappo y = 
-            map_Upd_seq (systemAppInit am) (varappo x) (scheduleInit sch)"
-  sorry
-*)
-
-(*
-lemma sysInit_upd_seq:
-  assumes wf_am: "wf_AppModel am"
-      and init: "isInitializing x"
-      and step: "stepsSys am com sch x y"
-      and exec_x: "systemExec x = Initialize (scheduleInit sch)"
-      and exec_y: "systemExec y = Initialize []"
-    shows "systemThread y = map_upd_seq (appModelInit am) (systemThread x) (scheduleInit sch)"
-*)
-(*
-lemma initSysTermInduction:
-  assumes wf_am: "wf_AppModel am"
-      and props: "sysInitProp am P"
-    shows "\<lbrakk> isInitializing x;
-            set (xs @ ys) \<subseteq> appModelCIDs am;
-            systemExec x = Initialize (xs @ ys);
-            systemExec y = Initialize ys;
-            stepsSys am com sch x y \<rbrakk> 
-              \<Longrightarrow> \<forall>c \<in> set xs. P c (tvar (systemThread y $ c), appo (systemThread y $ c))"
-(*  using props unfolding sysInitProp_def*)
+  "\<lbrakk> isInitializing x; stepsSys am com sch x y;
+     systemExec x = Initialize xs; systemExec y = Initialize [] \<rbrakk> \<Longrightarrow> 
+     varappo y \<in> map_Upd_seq (systemAppInit am) {varappo x} xs"
 proof (induction xs arbitrary: x)
   case Nil
-  then show ?case
-    by simp
+  then show ?case unfolding varappo_def stepsSys_def using sysInit_seq_none by fastforce
 next
   case (Cons a xs)
-  have h1: "systemExec x = Initialize (a # xs @ ys)" by (simp add: Cons.prems(3))
-  obtain z where h2: "stepSys am com sch x z"
-             and h3: "stepsSys am com sch z y"
-    by (metis Cons.prems(4) Cons.prems(5) Cons_eq_appendI Exec.inject(1) append_self_conv2 
-          converse_rtranclpE h1 list.distinct(1) stepsSys_def)
-  have h4: "systemExec z = Initialize (xs @ ys)" 
-    using h1 h2 h3 stepSysInit_redsch_ruleinv[of x a "xs @ ys" am com sch z] Cons.prems(1) by blast
-  have h5: "isInitializing z" using stepSysInit_initInv_ruleinv[of x a "xs @ ys" am com sch z]
-    using Cons.prems(1) h1 h2 by blast
-  have h6: "\<forall>c\<in>set xs. P c (tvar (systemThread y $ c), appo (systemThread y $ c))"
-    using Cons.IH Cons.prems(2) Cons.prems(4) h3 h4 h5 by simp
-  have h7: "a \<in> appModelCIDs am" 
-    using Cons.prems(2) by simp
-  have h8: "stepInit (appModelApp am $ a) (systemThread x $ a) (systemThread z $ a)"
-    using stepSysInit_ruleinv[of x a "xs @ ys" am com sch z]
-    using Cons.prems(1) h1 h2 by fastforce
-  have h9: "P a (tvar (systemThread z $ a), appo (systemThread z $ a))"
-    using h7 h8 props unfolding sysInitProp_def by blast
-  (*have g1: ""*)
-  then show ?case
+  obtain z where z1: "stepSys am com sch x z" 
+             and z2: "stepsSys am com sch z y"
+    using Cons.prems unfolding stepsSys_def
+    by (metis Exec.inject(1) converse_rtranclpE list.distinct(1))
+    have z3: "systemExec z = Initialize (xs)" using z1
+      by (metis Cons.prems(1) Cons.prems(3) stepSysInit_redsch_ruleinv)
+    have z4: "varappo z \<in> map_Upd_seq (systemAppInit am) {varappo x} [a]" 
+      using sysInit_step_seq Cons.prems(3) z1 by fastforce
+  show ?case using Cons.prems Cons.IH[of z] z1 z2 z3 z4
+    by (metis (no_types, opaque_lifting) append_Cons append_Nil map_Upd_seq_comp_in stepSysInit_initInv_ruleinv)
+qed
+
+lemma sysInit_init_seq:
+  assumes init: "isInitializing x"
+      and steps: "stepsSys am com sch x y"
+      and exec_x: "systemExec x = Initialize (scheduleInit sch)"
+      and exec_y: "systemExec y = Initialize []"
+    shows "varappo y \<in> map_Upd_seq (systemAppInit am) {varappo x} (scheduleInit sch)"
+  using assms by (simp add: sysInit_seq)
+
+lemma sysInit_init_merge:
+  assumes wf_am: "wf_AppModel am"
+      and wf_sch: "wf_SystemSchedule (appModel am) sch"
+      and init: "isInitializing x"
+      and steps: "stepsSys am com sch x y"
+      and exec_x: "systemExec x = Initialize (scheduleInit sch)"
+      and exec_y: "systemExec y = Initialize []"
+    shows "varappo y \<in> 
+    {varappo x} ** {\<Uplus>\<^sub>m set ms |ms. map_seq_in ms (map (maps_of (systemAppInit am)) (scheduleInit sch))}"
+proof -
+  have h1: "card (set (scheduleInit sch)) = length (scheduleInit sch)"
+    using wf_sch unfolding wf_SystemSchedule_def by simp
+  have h2: "\<forall>c \<in> dom (modelCompDescrs (appModel am)). (\<exists>ws qs. (appModelInit am c) ws qs)"
+    using wf_am unfolding wf_AppModel_def wf_App_def wf_CIDAppCIDAPP_def wf_CIDApp_def by simp
+  hence h3: "\<forall>x \<in> set (scheduleInit sch). systemAppInit am x \<noteq> {}"
+    using wf_sch unfolding wf_SystemSchedule_def systemAppInit_def by simp
+  show ?thesis 
+    using exec_x exec_y init steps h1 h3 
+      sysInit_init_seq[of x am com sch y] 
+      map_Upd_Merge[of "(scheduleInit sch)" "(systemAppInit am)" "{varappo x}"]
     by blast
 qed
 
-lemma initSysTerm:
+lemma sysInit_init_prop:
   assumes wf_am: "wf_AppModel am"
       and wf_sch: "wf_SystemSchedule (appModel am) sch"
+      and wf_state: "dom (systemThread x) \<subseteq> appModelCIDs am" (* to be included in wf_Thread *)
       and init: "isInitializing x"
       and exec_x: "systemExec x = Initialize (scheduleInit sch)"
       and exec_y: "systemExec y = Initialize []"
       and steps: "stepsSys am com sch x y"
-      and props: "sysInitProp am P"
+      and vc: "\<And>c. c \<in> appModelCIDs am \<Longrightarrow> appInitProp (appModelApp am $ c) (P c)"
     shows "sysAllInitProp am P y"
 proof -
-  have "set (scheduleInit sch) = dom (modelCompDescrs (appModel am))"
-    using wf_SystemSchedule_def wf_sch by blast
-  thus ?thesis
-  using initSysTermInduction[of am P x "(scheduleInit sch)" "[]" y com sch]
-  unfolding appInitProp_def sysAllInitProp_def 
-  apply simp
-  using exec_x exec_y init isInitializing.simps props steps wf_am by blast
+  have h0: "dom (varappo x) \<subseteq> appModelCIDs am" using wf_state unfolding varappo_def dom_def by auto
+  have h1: "varappo y \<in> {varappo x} ** {\<Uplus>\<^sub>m set ms |ms. map_seq_in ms (map (maps_of (systemAppInit am)) (scheduleInit sch))}"
+    using exec_x exec_y init steps sysInit_init_merge wf_am wf_sch by blast
+  have g0: "\<forall>m \<in> {\<Uplus>\<^sub>m set ms |ms. map_seq_in ms (map (maps_of (systemAppInit am)) (scheduleInit sch))}. dom (varappo x) \<subseteq> dom m"
+    using h0 wf_sch unfolding wf_SystemSchedule_def
+    by (smt (verit, best) CollectD appModelCIDs.elims appModelCompDescrs.simps map_seq_merge_eq)
+  have g1: "varappo y \<in> {\<Uplus>\<^sub>m set ms |ms. map_seq_in ms (map (maps_of (systemAppInit am)) (scheduleInit sch))}"
+    by (metis (no_types, lifting) g0 h1 map_Add_extend singleton_iff)
+  hence h2: "\<And>c. c \<in> appModelCIDs am \<Longrightarrow> varappo y $ c \<in> systemAppInit am c"
+  proof -
+    fix c
+    assume a1: "c \<in> appModelCIDs am"
+    have "card (set (scheduleInit sch)) = length (scheduleInit sch)"
+      using wf_SystemSchedule_def wf_sch by presburger
+    show "varappo y $ c \<in> systemAppInit am c"
+      using a1 g1 map_seq_merge_el wf_SystemSchedule_def wf_sch by fastforce
+  qed
+  hence h3: "\<forall>c \<in> appModelCIDs am. (tvar (systemThread y $ c), appo (systemThread y $ c)) \<in> systemAppInit am c"
+    using g1 wf_sch unfolding wf_SystemSchedule_def
+    by (smt (verit, ccfv_SIG) appModelCIDs.elims appModelCompDescrs.simps domIff map_seq_dom_dep 
+        map_some_val_given mem_Collect_eq varappo_def)
+  have h4: "\<forall>c \<in> appModelCIDs am. P c (tvar (systemThread y $ c), appo (systemThread y $ c))"
+    by (smt (verit) appInitProp_def appModelInit.simps h3 mem_Collect_eq systemAppInit_def vc)
+  thus ?thesis using sysAllInitProp_def by blast
 qed
-*)
+
 definition sysAppInvProp where "sysAppInvProp cids P I \<equiv> \<forall>c \<in> cids. \<forall>x p. P c (x, p) \<longrightarrow> I c x"
 
 (* App computation invariant I on local variables and output port properties P. *)

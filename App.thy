@@ -134,6 +134,7 @@ by @{term appCompute}.
 
 definition wf_App :: "Model \<Rightarrow> 'a App \<Rightarrow> bool"
   where "wf_App m a \<equiv> 
+    (\<exists>ws qs. appInit a ws qs) \<and>
     (\<forall>ws qs. appInit a ws qs \<longrightarrow> (\<forall>p \<in> dom qs. isOutPID m p)) \<and>
     (\<forall>vs ps d ws qs. appCompute a vs ps d ws qs \<longrightarrow> 
       (\<forall>p \<in> dom ps. isInPID m p) \<and> (\<forall>p \<in> dom qs. isOutPID m p)) \<and>

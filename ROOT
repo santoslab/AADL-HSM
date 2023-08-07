@@ -15,5 +15,9 @@ session "hamr-isabelle-V1" = HOL +
     Behavior
     Properties
     TempControlModel
+    TempControlInitialThreadStates
   document_files
     "root.tex"
+    "temp-control-aadl-overview.tex"
+    "listings-aadl-format.tex"
+    "temp-control-graphical.png"

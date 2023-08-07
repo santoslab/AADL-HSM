@@ -1,6 +1,8 @@
 \documentclass[10pt,oneside]{book}
 \usepackage[T1]{fontenc}
 \usepackage{isabelle,isabellesym}
+\usepackage{graphicx}
+\usepackage{listings}
 
 % further packages required for unusual symbols (see also
 % isabellesym.sty), use only when needed
@@ -111,11 +113,32 @@
 
 \chapter{Model Examples}
 
+This chapter includes examples of how the HAMR model-driven
+development tool chain translates AADL instance model information into
+the types defined in Model.thy.   Along with the model information,
+lemmas for model well-formedness are generated, and these are
+automatically proved by Isabelle.   This information is derived
+directly from and is traceable to the representation of AADL model
+information in HAMR-generated code.
+
+\section{Temperature Control Example}
+
+\input{temp-control-aadl-overview}
+
 \input{TempControlModel}
+
 
 \chapter{Initial State Examples}
 
+This chapter includes examples of how the HAMR model-driven
+development tool chain generates runtime state information into the
+Isabelle AADL-HSM state representation.  This information is derived
+directly from and is traceable to the representation of AADL model
+information and state information in HAMR-generated code.
 
+\section{Temperature Control Example}
+
+\input{TempControlInitialThreadStates}
 
 
 \end{document}
