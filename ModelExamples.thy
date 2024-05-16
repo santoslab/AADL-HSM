@@ -330,5 +330,13 @@ lemma sysModel_wf_Model_InDataPorts: "wf_Model_InDataPorts sysModel"
 lemma sysModel_wf_Model_SporadicComp: "wf_Model_SporadicComp sysModel"
   by (simp add: wf_Model_SporadicComp_def)
 
+lemma sysModel_wf_Model: "wf_Model sysModel"
+  using sysModel_wf_Model_CompDescrsContainedPortIds sysModel_wf_Model_CompDescrsIds 
+        sysModel_wf_Model_ConnsPortCategories sysModel_wf_Model_ConnsPortIds 
+        sysModel_wf_Model_DisjointPortIds sysModel_wf_Model_InDataPorts 
+        sysModel_wf_Model_PortDescr sysModel_wf_Model_PortDescrsCompId 
+        sysModel_wf_Model_PortDescrsIds sysModel_wf_Model_SporadicComp wf_Model_def 
+  by blast
+
 end
 

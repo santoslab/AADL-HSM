@@ -3,6 +3,7 @@
 \usepackage{isabelle,isabellesym}
 \usepackage{graphicx}
 \usepackage{listings}
+\usepackage{color}
 
 % further packages required for unusual symbols (see also
 % isabellesym.sty), use only when needed
@@ -44,6 +45,11 @@
 % \addtolength{\topmargin}{-.875in}
 % \addtolength{\textheight}{1.75in}
 
+%% ========= Macros ===========
+
+\newcommand{\edcomment}[1]{{\sf \color{red} ({#1})}}
+
+% \newcommand{\edcomment}[1]{{\sf ((#1))}}
 
 \begin{document}
 
@@ -104,7 +110,10 @@
 
 \part{Libraries}
 
-\chapter{Libraries}
+\chapter{State Reordering}
+
+This chapter describes states as partial maps and defines concepts that permit
+reasoning and reordering of sequences of states and state updates.
 
 \input{SetsAndMaps}
 

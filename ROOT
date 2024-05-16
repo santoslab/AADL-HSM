@@ -5,13 +5,15 @@ session "hamr-isabelle-V1" = HOL +
     B *)
   theories
     Model
+    ModelExamples
     VarState
     Queue
     PortState
     ThreadState
     DispatchLogic
-    App
     SystemState
+    RuntimeExamples
+    App
     Behavior
     Properties
     TempControlModel

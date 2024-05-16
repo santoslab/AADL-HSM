@@ -1,52 +1,64 @@
+subsubsection \<open>Isabelle Model Representation\<close>
+
 theory TempControlModel
-  imports Model VarState PortState ThreadState
+  imports Model 
 begin
 
+text \<open>The following are @{term PortDescr} definitions for the ports of the {\tt TempSensor} component.\<close>
 (*===============================================================*
  *   C o m p o n e n t: TempControlSoftwareSystem_s_Instance_tcproc_tempSensor [id = (CompId 0)] ---
  *===============================================================*)
 
+text \<open>@{term PortDescr} for the {\tt currrentTemp} port.  The names and ids for ports 
+and components are generated from what HAMR uses for code generation.\<close>
+
 (* -- Port: TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_currentTemp [id = (PortId 0)] -- *)
 definition TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_currentTemp where
   "TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_currentTemp =
-    mkPortDescr
-     ''TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_currentTemp''
-     (PortId 0)
-     (CompId 0)
-     Out
-     Data
-     1
-     0"
+    mkPortDescr 
+     ''TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_currentTemp'' \<comment> \<open>Fully-qualified port name.\<close>
+     (PortId 0) \<comment> \<open>Port identifier for this port.\<close>
+     (CompId 0) \<comment> \<open>Component identifier for the parent component for this port.\<close>
+     Out  \<comment> \<open>Port direction.\<close>
+     Data \<comment> \<open>Port kind.\<close>
+     1 \<comment> \<open>Maximum number of values in port buffer.\<close>
+     0" \<comment> \<open>Urgency (priority).\<close>
+
+text \<open>Add this definition to the list of definitions that will be automatically
+unfolded by the Isabelle simplifier.  This is primarily used to automatically prove 
+model well-formedness using the "simp" tactic.\<close>
+
 declare TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_currentTemp_def [simp add]
 
-
+text \<open>@{term PortDescr} for the {\tt tempChanged} port.\<close>
 (* -- Port: TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_tempChanged [id = (PortId 1)] -- *)
 definition TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_tempChanged where
   "TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_tempChanged =
     mkPortDescr
-     ''TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_tempChanged''
-     (PortId 1)
-     (CompId 0)
-     Out
-     Event
-     1
-     0"
+     ''TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_tempChanged'' \<comment> \<open>Fully-qualified port name.\<close>
+     (PortId 1) \<comment> \<open>Port identifier for this port.\<close>
+     (CompId 0) \<comment> \<open>Component identifier for the parent component for this port.\<close>
+     Out  \<comment> \<open>Port direction.\<close>
+     Event  \<comment> \<open>Port kind.\<close>
+     1 \<comment> \<open>Maximum number of values in port buffer.\<close>
+     0" \<comment> \<open>Urgency (priority).\<close>
 declare TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_tempChanged_def [simp add]
 
-
+text \<open>Now, we have the @{term CompDescr} definition for the {\tt TempSensor} component.\<close>
 (* -- Comp: TempControlSoftwareSystem_s_Instance_tcproc_tempSensor [id = (CompId 0)] -- *)
 definition TempControlSoftwareSystem_s_Instance_tcproc_tempSensor where
   "TempControlSoftwareSystem_s_Instance_tcproc_tempSensor =
      mkCompDescr
-     ''TempControlSoftwareSystem_s_Instance_tcproc_tempSensor''
-     (CompId 0)
-     {(PortId 0),(PortId 1)}
-     DispatchProtocol.Periodic
-     {}
-     {}"
+     ''TempControlSoftwareSystem_s_Instance_tcproc_tempSensor'' \<comment> \<open>Fully-qualified component name.\<close>
+     (CompId 0) \<comment> \<open>Component identifier for this component.\<close>
+     {(PortId 0),(PortId 1)}  \<comment> \<open>Set of identifiers of ports that belong to this component.\<close>
+     DispatchProtocol.Periodic  \<comment> \<open>Dispatch protocol.\<close>
+     {}  \<comment> \<open>Identifiers of ports that are dispatch triggers.\<close>
+     {}" \<comment> \<open>Identifiers of component local variables.\<close>
 declare TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_def [simp add]
 
 
+text \<open>Explanations for other ports and components are similar.\<close>
 
 (*===============================================================*
  *   C o m p o n e n t: TempControlSoftwareSystem_s_Instance_tcproc_fan [id = (CompId 1)] ---
@@ -246,19 +258,23 @@ declare TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_def [simp 
  *   S Y S T E M   C O N N E C T I O N S
  *===============================================================*)
 
+text \<open>The definition below specifies the connections of the system.\<close>
+
 definition sysConns
   where "sysConns = map_of [
-    ((PortId 0), {(PortId 4),(PortId 9)}),
-    ((PortId 1), {(PortId 8),(PortId 11)}),
-    ((PortId 3), {(PortId 5)}),
-    ((PortId 7), {(PortId 2)}),
-    ((PortId 10), {(PortId 6)})
+    ((PortId 0), {(PortId 4),(PortId 9)}), \<comment> \<open>TempSensor currentTemp is connected to currentTemp ports for TempControl and OperatorInterface. \<close>
+    ((PortId 1), {(PortId 8),(PortId 11)}), \<comment> \<open>TempSensor tempChanged is connected to tempChanged ports for TempControl and OperatorInterface. \<close>
+    ((PortId 3), {(PortId 5)}), \<comment> \<open>TempControl fanCmd is connected to fanCmd port of Fan component.\<close>
+    ((PortId 7), {(PortId 2)}), \<comment> \<open>Fan ack is connected to ack port of TempControl component.\<close>
+    ((PortId 10), {(PortId 6)}) \<comment> \<open>OperatorInterface setPoint is connected to setPoint port of TempControl component.\<close>
   ]"
 declare sysConns_def [simp add]
 
 (*===============================================================*
 *   P O R T   D E S C R I P T O R S
 *===============================================================*)
+
+text \<open>The definition below maps each port identifier to a port descriptor.\<close>
 
 definition sysPortDescrs
   where "sysPortDescrs = map_of [
@@ -281,6 +297,8 @@ declare sysPortDescrs_def [simp add]
 *   C O M P O N E N T   D E S C R I P T O R S
 *===============================================================*)
 
+text \<open>The definition below maps each component identifier to a component descriptor.\<close>
+
 definition sysCompDescrs
   where "sysCompDescrs = map_of [
     ((CompId 0), TempControlSoftwareSystem_s_Instance_tcproc_tempSensor),
@@ -294,9 +312,13 @@ declare sysCompDescrs_def [simp add]
 *   T O P - L E V E L  S Y S T E M   M O D E L
 *===============================================================*)
 
+text \<open>The definition below is the top-level model structure for the system.\<close>
+
 definition sysModel
   where "sysModel = mkModel sysCompDescrs sysPortDescrs sysConns"
 declare sysModel_def [simp add]
+
+text \<open>The following definitions establish various model well-formedness properties.\<close>
 
 lemma sysModel_wf_Model_PortDescr: "wf_Model_PortDescr sysModel"
   by (simp add: wf_Model_PortDescr_def wf_PortDescr_def)

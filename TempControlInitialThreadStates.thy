@@ -62,11 +62,11 @@ thread.\<close>
 definition TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_initial :: "int ThreadState" where [simp add]:
   "TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_initial =
      ( tstate
-        TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_tvar_initial
         TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_infi_initial
         TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_appi_initial
         TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_appo_initial
         TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_info_initial
+        TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_tvar_initial
         TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_disp_initial
      )"
 
@@ -95,11 +95,11 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_fan_disp_initial :: "Disp
 definition TempControlSoftwareSystem_s_Instance_tcproc_fan_initial :: "int ThreadState" where [simp add]:
   "TempControlSoftwareSystem_s_Instance_tcproc_fan_initial =
      ( tstate
-        TempControlSoftwareSystem_s_Instance_tcproc_fan_tvar_initial
         TempControlSoftwareSystem_s_Instance_tcproc_fan_infi_initial
         TempControlSoftwareSystem_s_Instance_tcproc_fan_appi_initial
         TempControlSoftwareSystem_s_Instance_tcproc_fan_appo_initial
         TempControlSoftwareSystem_s_Instance_tcproc_fan_info_initial
+        TempControlSoftwareSystem_s_Instance_tcproc_fan_tvar_initial
         TempControlSoftwareSystem_s_Instance_tcproc_fan_disp_initial
      )"
 
@@ -127,11 +127,11 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_tempControl_disp_initial 
 definition TempControlSoftwareSystem_s_Instance_tcproc_tempControl_initial :: "int ThreadState" where [simp add]:
   "TempControlSoftwareSystem_s_Instance_tcproc_tempControl_initial =
      ( tstate
-        TempControlSoftwareSystem_s_Instance_tcproc_tempControl_tvar_initial
         TempControlSoftwareSystem_s_Instance_tcproc_tempControl_infi_initial
         TempControlSoftwareSystem_s_Instance_tcproc_tempControl_appi_initial
         TempControlSoftwareSystem_s_Instance_tcproc_tempControl_appo_initial
         TempControlSoftwareSystem_s_Instance_tcproc_tempControl_info_initial
+        TempControlSoftwareSystem_s_Instance_tcproc_tempControl_tvar_initial
         TempControlSoftwareSystem_s_Instance_tcproc_tempControl_disp_initial
      )"
 
@@ -159,11 +159,11 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_disp_in
 definition TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_initial :: "int ThreadState" where [simp add]:
   "TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_initial =
      ( tstate
-        TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_tvar_initial
         TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_infi_initial
         TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_appi_initial
         TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_appo_initial
         TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_info_initial
+        TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_tvar_initial
         TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_disp_initial
      )"
 

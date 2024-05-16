@@ -1,73 +1,35 @@
-text \<open>The theory in this chapter formalizes the representation of thread application logic.
-The theory depends static model information (e.g., to determine domains of state
-representations such as the port identifiers may be referenced as input and output ports)
-as well as thread state specifications.\<close>
-
-theory App
-  imports Main Model ThreadState 
-begin
-
 section \<open>Relational Behavior of Thread Application Logic\<close>
 
-text \<open>The AADL standard specifies that the application code for a Thread component 
-is organized into code "entry points" that are invoked by the AADL run time.
-Our semantics currently supports the Initialize and Compute entry points.
+theory App
+  imports Main VarState PortState ThreadState Model
+begin
 
-While a thread's application logic could be formalized in a variety of ways, e.g., 
-an automata based on the AADL Behavioral Annex (BA) or its adaptation in BLESS,
-our representation is geared toward making a strong connection to behavioral
-contract languages used to specify the behavior of threads coded in a programming
-language.
+subsection \<open>Application Logic Relations\<close>
 
-In the GUMBO AADL contract language, contracts are attached to AADL Thread component
+text \<open>The application code for an AADL Thread component is organized into entry points.
+This semantics currently supports the Initialization and Compute entry points.
+In the HAMR/GUMBO framework, GUMBO contracts are attached to AADL Thread component
 interfaces, and then thread entry point code is shown to conform to the contracts
-using other techniques.  As part of our broader work, we have shown how
-SMT-based verification in the Logika tool can prove that thread application code
-written in Slang (a safety-critical subset of Scala) conforms to Logika contracts
-automatically derived from AADL-level GUMBO contracts.  In addition, we 
-have developed an approach for automated property-based testing to demonstrate
-Slang code conformance with executable versions of GUMBO contracts.
+via SMT-based verification in Logika or via testing.
 
-Our semantics is not hard-wired to GUMBO contracts. However, HAMR, GUMBO, and 
-this semantics are all designed to work "hand in glove":
-\begin{itemize}
-\item we aim to (eventually) prove the soundness of GUMBO with respect to this semantics, and
-\item we aim to support a formal methods tool chain by which HAMR thread application code is 
-proved to conform to GUMBO contracts using Logika, and then GUMBO contracts (which summarize
-thread application logic behaviors) are translated
-into the definitions in this theory to support Isabelle-based proofs of end-to-end system
-behavior (experience with this approach will drive the design of a more automated system
-verification in Logika that uses rules proven sound in this framework).  
-\end{itemize}
-
-Here are the key technical points.  Roughly speaking, each GUMBO entry point contract specifies a 
+Roughly speaking, each entry point contract specifies a 
 a relation between component input ports and output ports and also characterizes how
-the thread's local variable state is updated during a thread activation. We represent
-each relation as a predicate on application input port states @{term appi}, 
-application output port states @{term appo}, dispatch status, and thread variable state.  We aggregate
-each entry point contract representation for a thread into a record as defined below.  Hereafter,
-for simplicity, we refer to a predicate providing the representation of a contract as the "contract" 
-when no confusion results.\<close>
+the thread's local variable state is transformed.  GUMBO contracts are
+automatically generated (planned) by HAMR into Isabelle as predicates
+on thread/port state elements.  These predicates are represented as a shallow
+embedding as reflected in the  @{text "InitContract"} and @{text "ComputeContract"}
+types shown below.  These predicates are then lifted to set-based definitions
+of component behaviors reflected in the @{text "InitRelation"} and 
+@{text "ComputeRelation"} types shown below.
 
-record 'a App =
-  appInit :: "'a VarState \<Rightarrow> 'a PortState \<Rightarrow> bool"
-  appCompute :: "'a VarState \<Rightarrow> 'a PortState \<Rightarrow> DispatchStatus \<Rightarrow> 'a VarState \<Rightarrow> 'a PortState \<Rightarrow> bool"
+Intuitively, the Initialize entry point takes as inputs the initial var state for
+the thread, where the value of each variable is set to an unspecified system default value, 
+and it gives each thread value an initial value.  In addition, it gives each
+output data port a value, and may optionally give each event-like port a value.
 
-text \<open>Intuitively, a thread's Initialize entry point code 
-provides initial values for the variables in the thread @{term VarState}
-and initial values for the thread application output ports @{term PortState}
-(according to the AADL standard,
-values for output data ports are required; values for output event-like ports are optional).
-Thus, an Initialize entry point contract puts constraints on a thread's variables and output
-port values, and such contracts are formalized as a predicates on @{term VarState} and
-output application @{term PortState}.  Intuitively, a thread state's @{term tvar} and
-@{term appo} fields will be constrained by these predicates in the thread and system semantics
-rules.
-
-According to the AADL standard, a thread \emph{does not} provide initial values for its 
-input ports.  Rather, input port initial values are obtained by an initial communication phase
-after executing Initialize entry points that propagates output port values to connected input
-port values.  This is why we omit input ports in the @{term appInit} predicate above. 
+Discuss / To Do:
+ - it's likely that as a simplifying assumption, we should require each output
+   data port to be given a value.  This should be stated in the well-formed condition.
 
 The Compute entry point takes as inputs the current var state, application input 
 port state, and dispatch status.  The dispatch status information is produced by
@@ -75,181 +37,213 @@ the AADL RunTime dispatch logic and indicates what triggered the dispatch of the
 thread.  This is most relevant for Sporadic threads where the dispatch status
 indicates the port that triggered the dispatch due to event arrival on that port.
 Conceptually, this allows the application logic to select behavior specific
-to the triggering event, e.g., in code corresponding to an event handler for the arriving event.
-The Compute entry point produces an updated var state in which individual
-variables are optionally updated and an updated output application port state
-in which output ports are optionally given values.
+to the triggering event, e.g., in code corresponding to an event handler.
+The Compute entry point produces an updated var state where individual
+variables are optionally updated and where output ports are optionally given values.
 \<close>
-
-text \<open>Each thread is associated to its application logic behavior via a 
-      mapping from @{term CompId}s to @{term App}s.\<close>
-
-type_synonym 'a CIDApp = "(CompId, 'a App) map" 
-
-text \<open>We wish to distinguish the specifications that the developer 
-supplies for an application (e.g., model information and thread application logic) 
-from the state and execution logic of the AADL run-time and underlying 
-execution platform.  Accordingly, we introduce a record type @{term AppModel} 
-for developer-supplied information that aggregates the structural model
-information (@{term Model}) and behavior specifications for each thread (@{term CIDApp}).
-Further separating the developer's structural specifications and behavior 
-specifications as in the record below permits the semantics to 
-support an approach for model refinement where the structural model remains unchanged 
-but the application logic can be considered at different abstraction levels.
-\<close>
-
-record 'a AppModel =
-  appModel :: "Model"
-  appModelApp :: "'a CIDApp"
-
-text \<open>The following helper functions are defined to access elements of an @{term AppModel}.\<close>
-
-fun appModelCompDescrs where "appModelCompDescrs am = modelCompDescrs (appModel am)"
-fun appModelPortDescrs where "appModelPortDescrs am = modelPortDescrs (appModel am)"
-fun appModelPortKind where "appModelPortKind am p = kind ((appModelPortDescrs am) $ p)"
-fun appModelConns where "appModelConns am = modelConns (appModel am)"
-fun appModelCIDs where "appModelCIDs am = dom (appModelCompDescrs am)"
-fun appModelPIDs where "appModelPIDs am = dom (appModelPortDescrs am)"
-fun appModelInit where "appModelInit am c = appInit (appModelApp am $ c)"
-fun appModelCompute where "appModelCompute am c = appCompute (appModelApp am $ c)"
-
-section \<open>Thread Application Logic Well-formedness Properties\<close>
-
-text \<open>This section presents several well-formedness properties for application logic
-predicates.  This properties are \<close>
 
 text \<open>
-The first property states basic constraints on app logic predicates with
-respect to the general model, but without
-regard to the model thread specifications associated with the app logic.  
-This is a weaker property that may be strengthened by other properties below
-when needed.   The constraints are:
-\begin{itemize}
-\item The port states constrained by @{term appInit} belong to output ports,
-\item @{term appCompute} relates input port states to output port states,
-\item All data ports from the model are constrained to have a non-empty value
-by @{term appCompute}.  
-\end{itemize}
+Below are the types for the shallow embedding predicate-based representations of GUMBO
+contracts.
 \<close>
 
-definition wf_App :: "Model \<Rightarrow> 'a App \<Rightarrow> bool"
-  where "wf_App m a \<equiv> 
-    (\<exists>ws qs. appInit a ws qs) \<and>
-    (\<forall>ws qs. appInit a ws qs \<longrightarrow> (\<forall>p \<in> dom qs. isOutPID m p)) \<and>
-    (\<forall>vs ps d ws qs. appCompute a vs ps d ws qs \<longrightarrow> 
-      (\<forall>p \<in> dom ps. isInPID m p) \<and> (\<forall>p \<in> dom qs. isOutPID m p)) \<and>
-    (\<forall>vs ps d ws qs. appCompute a vs ps d ws qs \<longrightarrow> 
-      (\<forall>q. isDataPD (modelPortDescrs m $ q) \<longrightarrow> \<not>isEmpty (qs $ q)))" (* added *)
+type_synonym 'a InitContract = "('a PortState \<Rightarrow> 'a VarState \<Rightarrow> bool)" 
+type_synonym 'a ComputeContract = "('a PortState \<Rightarrow> 'a VarState \<Rightarrow> 
+                                     DispatchStatus \<Rightarrow> 
+                                     'a PortState \<Rightarrow> 'a VarState \<Rightarrow> bool)" 
 
-(* From John:  Suggested refinements
-    - dom ca = dom (modelCompDescrs m)
-    - [informal] \<forall>c \<in> dom ca .  wf_ThreadState_appi m c [app input ports](ca $ c)
-    - [informal] \<forall>c \<in> dom ca .  wf_ThreadState_appo m c [app output ports](ca $ c)
-    - [informal] \<forall>c \<in> dom ca .  wf_ThreadState_vars m c [app vars](ca $ c)
-*)
-
-text \<open>The following property further constrains app logic predicates to the
-features of a specific thread @{term c}:
-\begin{itemize}
-\item any variable state that satisfies @{term appInit} must only contain
-variable ids from thread @{term c}
-\item any port state that satisfies @{term appInit} must only contain
-port ids from thread @{term c}
-\item any variable state that satisfies @{term appCompute} must only contain
-variable ids from thread @{term c}
-\item any port state that satisfies @{term appCompute} must only contain
-port ids from thread @{term c}
-\item any port state that satisfies the @{term appCompute} on output port states
-must only contain output port ids from thread @{term c}.
-\end{itemize}
+text \<open>
+Below are the types for the set-based representations of component behaviors (which
+will be derived from the predicate representation of the contracts).
 \<close>
 
-definition wf_CIDAppCIDAPP where "wf_CIDAppCIDAPP m c a \<equiv> 
-  (wf_App m a) \<and>
-  (\<forall>ws qs. appInit a ws qs \<longrightarrow> 
-    (\<forall>v. v \<in> dom ws \<longrightarrow> isVarOfCID m c v) \<and>
-    (\<forall>p. p \<in> dom qs \<longrightarrow> isPortOfCIDPID m c p)) \<and>
-  (\<forall>vs ps d ws qs. appCompute a vs ps d ws qs \<longrightarrow>  
-    (\<forall>v. v \<in> dom vs \<union> dom ws \<longrightarrow> isVarOfCID m c v) \<and>
-    (\<forall>p. p \<in> dom ps \<union> dom qs \<longrightarrow> isPortOfCIDPID m c p) \<and>
-    (\<forall>q. q \<in> dom qs \<longleftrightarrow> isPortOfCIDPID m c q \<and> isOutPID m q))" 
+type_synonym 'a InitBehavior = "('a PortState  \<Rightarrow> 'a VarState \<Rightarrow> bool)" 
+type_synonym 'a ComputeBehavior = "('a PortState \<Rightarrow> 'a VarState \<Rightarrow> 
+                                    DispatchStatus \<Rightarrow> 
+                                    'a PortState \<Rightarrow> 'a VarState \<Rightarrow> bool)" 
 
-text \<open>A model's thread application logic is well-formed if each individual
-thread's app logic is well-formed.\<close>
+text \<open>The following type represents (abstractly) the behavior of the 
+thread component's application code as derived from its contracts. 
+\<close>
 
-definition wf_CIDApp where "wf_CIDApp m ca \<equiv> \<forall>c. wf_CIDAppCIDAPP m c (ca $ c)"
+record 'a AppBehavior =
+  appInit :: "'a InitBehavior"
+  appCompute :: "'a ComputeBehavior" 
 
-(* ToDo: In the definition above, probably want to say that the domain of CIDApp matches the domain of the models compDescrs. *)
 
-text \<open>A model integrated with app logic is well-formed if the model is well-formed
-and if the app logic is well-formed with respect to the model.\<close>
+(* add outPorts to domain of compute if necessary; it needs to be ensured that all outPorts are defined at the end *)
 
-definition wf_AppModel where 
-  "wf_AppModel am \<equiv> wf_Model (appModel am) 
-                  \<and> wf_CIDApp (appModel am) (appModelApp am)"
+text \<open>
+The following definitions "lift" the predicate/contract-based representation 
+into a set-based representation.  
 
-(* ToDo: If the following definitions in comments below are no longer needed, we can
-remove them in the cleanup before the public release of the model artifacts. *)
+The strategy for handling contract well-formedness issues is important and was the 
+subject of much deliberation. From a practical/implementation point of view,
+HAMR will check that each GUMBO contract is well-formed in the sense that:
+\begin{itemize}
+\item it only reference features (ports, variables) from component to which it belongs,
+\item it doesn't confuse input and output ports,
+\item it doesn't confuse types associated with ports and variables.
+\end{itemize}
 
-(*
-fun init_seq_fw where
-  "init_seq_fw app i [] = i"
-| "init_seq_fw app i (c#cs) = 
-    init_seq_fw app 
-      (\<Union>(vs, vs', ps') \<in> i. { (vs, vs' ++ vs'', ps' ++ ps'') | vs'' ps'' . (vs, (vs', ps')) \<in> app c }) cs"
+With a shallow embedding representation of contracts, there is no way to directly
+check (confirm) those properties in the Isabelle representation.  For example, 
+to check type correctness, we would need a formalization of predicate expression
+ASTs and an associated type checker.
 
-fun init_seq where
-  "init_seq app [] vp = vp"
-| "init_seq app (c#cs) vp = 
-    init_seq app cs (\<Union>(vs, ps) \<in> vp. { (vs', ps ++ ps') | vs' ps' . (vs, (vs', ps')) \<in> app c })"
-*)
-(*
-fun init_seq where
-  "init_seq app [] vp = vp"
-| "init_seq app (c#cs) vp = 
-    init_seq app cs (\<Union>(vs, ps) \<in> vp. { (vs', ps ++ ps') | vs' ps' . (vs, (vs', ps')) \<in> app c })"
-*)
-(*
-lemma appInitParallel:
-  assumes wf_am: "wf_AppModel am"
-      and cs_cid: "cs \<subseteq> appModelCIDs am"
-    shows "\<lbrakk> set cseq = cs; length cseq = card cs \<rbrakk> \<Longrightarrow> 
-      init_seq (\<lambda>c. appInit (appModelApp am $ c)) cseq {s} \<subseteq> 
-        ({ (\<Uplus>\<^sub>m {y c | c. c \<in> cs}, \<Uplus>\<^sub>m {z c | c. c \<in> cs}) 
-          | x y z c. c \<in> cs \<and> (x, y c, z c) \<in> appInit (appModelApp am $ c) })"
-proof (standard; induction cseq arbitrary: cs)
-  case Nil
-  then show ?case sorry
-next
-  case (Cons a cseq)
-  then show ?case sorry
-qed
-*)
-(*
-lemma appInitParallel:
-  assumes wf_am: "wf_AppModel am"
-      and cs_cid: "cs \<subseteq> appModelCIDs am"
-      and cs_1: "cs1 \<in> lists cs"
-    shows "init_seq (\<lambda>c. appInit (appModelApp am $ c)) cs1 {s} = 
-      ({ (\<Uplus>\<^sub>m {y c | c. c \<in> cs}, \<Uplus>\<^sub>m {z c | c. c \<in> cs}) 
-            | x y z c. c \<in> cs \<and> (x, y c, z c) \<in> appInit (appModelApp am $ c) })"
-proof
-  show "init_seq (\<lambda>c. appInit (appModelApp am $ c)) cs1 {s} \<subseteq> 
-      ({ (\<Uplus>\<^sub>m {y c | c. c \<in> cs}, \<Uplus>\<^sub>m {z c | c. c \<in> cs}) 
-            | x y z c. c \<in> cs \<and> (x, y c, z c) \<in> appInit (appModelApp am $ c) })"
-  
-next
-  show "({ (\<Uplus>\<^sub>m {y c | c. c \<in> cs}, \<Uplus>\<^sub>m {z c | c. c \<in> cs}) 
-          | x y z c. c \<in> cs \<and> (x, y c, z c) \<in> appInit (appModelApp am $ c) }) \<subseteq>
-            init_seq (\<lambda>c. appInit (appModelApp am $ c)) cs1 {s}" sorry
-qed
-*)
-(*
-lemma appInitSetNonIntereference:
-  assumes wf_am: "wf_AppModel am"
-      and cs_cid: "cs \<subseteq> appModelCIDs am"
-      and c_cid: "c \<in> appModelCIDs am - cs"
-    shows ""
-*)
+Ultimately, we desire that, given a well-formed input @{term ThreadState}, the
+relational app behavior of a component will yield well-formed output 
+@{term ThreadState}s.  This will enable us support the fundamental run-time
+property that each thread execution step in the semantics preserves
+well-formed thread-states.  Note that HAMR should also guarantee this, and
+we eventually want to demonstrate this by showing HAMR state logs conform
+with Isabelle system execution steps.
+
+In any case, the following definitions are currently designed so that,
+in lifting from the predicate representations of the contracts, the
+predicates are only applied to well-formed input and output thread states.
+
+Therefore, we would expect that the presence of mal-formed HAMR contracts
+(manifested in mal-formed predicates) would give rise to empty relations.
+
+An alternative approach that needs to be investigated is that we only
+assume input states are well-formed, and we prove that, for a given
+contract, output states are well-formed.  This will require that we
+add frame-conditions to the contracts (intuitively, capturing 
+implicit properties that HAMR ensures during entry point execution).
+\<close>
+
+(* infrastructure / well-formedness conditions on initialize app behavior.
+   We need to be able to establish that the output of the InitEP is a well-formed
+   thread state. *)
+
+definition initInfrastructureContract :: "Model \<Rightarrow> CompId \<Rightarrow> 'a InitContract"
+  where "initInfrastructureContract m cid ao tv \<equiv> 
+              wf_ThreadState_appo m cid ao
+          \<and>   wf_ThreadState_tvar m cid tv"
+
+
+(* infrastructure conditions on compute app behavior.
+   Basically, the idea is that we need to show that well-formed properties are preserved.
+   That might be derived from frame conditions on the different portions of the thread state.
+   For now, simply use the existing well-formedness on both the input and outputs. *)
+
+definition computeInfrastructureContract :: "Model \<Rightarrow> CompId \<Rightarrow> 'a ComputeContract"
+  where "computeInfrastructureContract m cid ai tvi ds ao tvo \<equiv> 
+           wf_ThreadState_appi m cid ai 
+        \<and>  wf_ThreadState_tvar m cid tvi
+        \<and>  wf_ThreadState_disp m cid ds
+        \<and>  wf_ThreadState_appo m cid ao 
+        \<and>  wf_ThreadState_tvar m cid tvo"
+
+
+fun mk_InitBehaviorFromContract :: "Model \<Rightarrow> CompId \<Rightarrow> 
+   'a InitContract \<Rightarrow> 'a InitBehavior" where
+  "mk_InitBehaviorFromContract m cid initContract ao tvo =
+             (initContract ao tvo 
+          \<and>  initInfrastructureContract m cid ao tvo)"
+
+fun mk_ComputeBehaviorFromContract :: "Model \<Rightarrow> CompId \<Rightarrow> 
+    'a ComputeContract
+ \<Rightarrow> 'a ComputeBehavior" where
+  "mk_ComputeBehaviorFromContract m cid computeContract ai tvi d ao tvo  =  
+           (computeContract ai tvi d ao tvo
+        \<and>  computeInfrastructureContract m cid ai tvi d ao tvo)"
+
+fun mk_AppBehaviorFromContracts ::
+  "Model \<Rightarrow> CompId \<Rightarrow> 'a InitContract \<Rightarrow> 'a ComputeContract \<Rightarrow> 'a AppBehavior" where
+  "mk_AppBehaviorFromContracts m cid initUserContract computeUserContract = \<lparr>
+    appInit = mk_InitBehaviorFromContract m cid initUserContract,
+    appCompute = mk_ComputeBehaviorFromContract m cid computeUserContract \<rparr>"
+
+                              
+(**** The plan is to refactor the wf_ThreadState properties to properly address
+      queue sizes before continuing with the definitions below. ****)
+
+text \<open>An @{term App} @{term a} is well-formed wrt a @{term Model} @{term m} and @{term CompId} @{term c} iff 
+the thread state elements associated with the relations (transfer functions) of @{term a} are well-formed wrt @{term m} 
+and @{term c}.\<close>
+
+(* The following property should probably be moved directly into the definitions
+   wf_ThreadState_appi and wf_ThreadState_appo *)
+
+definition wf_ThreadState_dataPorts :: "Model \<Rightarrow> CompId \<Rightarrow> 'a PortState \<Rightarrow> bool"
+  where "wf_ThreadState_dataPorts m c ps \<equiv>
+          \<forall>p \<in> dom ps . isDataPID m p \<longrightarrow> isOneElement (ps $ p)"
+
+definition wf_InitBehavior:: "Model \<Rightarrow> CompId \<Rightarrow> 'a InitBehavior \<Rightarrow> bool" 
+  where "wf_InitBehavior m c initBehavior \<equiv>
+    (\<forall>ao tvo . initBehavior ao tvo \<longrightarrow> 
+      (  wf_ThreadState_appo m c ao
+       \<and> wf_ThreadState_tvar m c tvo
+       \<and> wf_ThreadState_dataPorts m c ao))"
+
+definition wf_InitBehavior_Inhabited:: "Model \<Rightarrow> CompId \<Rightarrow> 'a InitBehavior \<Rightarrow> bool" 
+  where "wf_InitBehavior_Inhabited m c initBehavior \<equiv>
+    (\<exists>ao tvo . initBehavior ao tvo)"
+
+definition wf_ComputeBehavior:: "Model \<Rightarrow> CompId \<Rightarrow> 'a ComputeBehavior \<Rightarrow> bool" 
+  where "wf_ComputeBehavior m c computeBehavior \<equiv>
+    (\<forall>ai tvi ds ao tvo . computeBehavior ai tvi ds ao tvo \<longrightarrow> 
+      (  wf_ThreadState_appi m c ai
+       \<and> wf_ThreadState_dataPorts m c ai 
+       \<and> wf_ThreadState_tvar m c tvi
+       \<and> wf_ThreadState_disp m c ds  
+       \<and> wf_ThreadState_appo m c ao
+       \<and> wf_ThreadState_dataPorts m c ao
+       \<and> wf_ThreadState_tvar m c tvo
+       ))"
+
+definition wf_ComputeBehavior_Inhabited:: "Model \<Rightarrow> CompId \<Rightarrow> 'a ComputeBehavior \<Rightarrow> bool" 
+  where "wf_ComputeBehavior_Inhabited m c computeBehavior \<equiv>
+    (\<exists>ai tvi ds ao tvo . computeBehavior ai tvi ds ao tvo)"
+
+definition wf_AppBehavior:: "Model \<Rightarrow> CompId \<Rightarrow> 'a AppBehavior \<Rightarrow> bool" 
+  where "wf_AppBehavior m c a \<equiv>
+    c \<in> dom (modelCompDescrs m)
+  \<and> wf_InitBehavior m c (appInit a)
+  \<and> wf_InitBehavior_Inhabited m c (appInit a)
+  \<and> wf_ComputeBehavior m c (appCompute a)
+  \<and> wf_ComputeBehavior_Inhabited m c (appCompute a)"
+
+
+text \<open>
+Each thread component is associated with its application logic via 
+an @{term AppBehaviors} structure -- a map from component identifiers to 
+application code behaviors.
+\<close>
+
+type_synonym 'a AppBehaviors = "(CompId, 'a AppBehavior) map" 
+
+text \<open>
+A @{term AppBehaviors} structure is well-formed, 
+if each @{term AppBehavior} is well-formed wrt the associated component.
+\<close>
+
+(* NOTE: this should probably constrain the domain of the map to match the set of 
+   Thread IDs declared in the model. *)
+
+definition wf_AppBehaviors where "wf_AppBehaviors m cb \<equiv> \<forall>c. wf_AppBehavior m c (cb $ c)"
+
+record 'a BehaviorModel =
+  bmmodel :: "Model"
+  bmbehaviors :: "'a AppBehaviors"
+
+definition wf_BehaviorModel where 
+  "wf_BehaviorModel bm \<equiv> 
+       wf_Model (bmmodel bm) 
+     \<and> wf_AppBehaviors (bmmodel bm) (bmbehaviors bm)"
+
+
+text \<open>The following helper functions are defined to access elements of a @{term BehaviorModel}.\<close>
+
+fun bmodelCompDescrs where "bmodelCompDescrs bm = modelCompDescrs (bmmodel bm)"
+fun bmodelPortDescrs where "bmodelPortDescrs bm = modelPortDescrs (bmmodel bm)"
+fun bmodelPortKind where "bmodelPortKind bm p = kind ((bmodelPortDescrs bm) $ p)"
+fun bmodelConns where "bmodelConns bm = modelConns (bmmodel bm)"
+fun bmodelCIDs where "bmodelCIDs bm = dom (bmodelCompDescrs bm)"
+fun bmodelPIDs where "bmodelPIDs bm = dom (bmodelPortDescrs bm)"
+fun bmodelInit where "bmodelInit bm c = appInit (bmbehaviors bm $ c)"
+fun bmodelCompute where "bmodelCompute bm c = appCompute (bmbehaviors bm $ c)"
 
 end

@@ -113,18 +113,18 @@ of the @{term ThreadState} is also summarized in PortState.thy.
 \item @{term disp} - the current dispatch status of the thread
 \end{itemize}
 \<close>
-record 'a ThreadState =
-  tvar :: "'a VarState" 
+record 'a ThreadState = 
   infi :: "'a PortState"
   appi :: "'a PortState"
   appo :: "'a PortState"
   info :: "'a PortState"
+  tvar :: "'a VarState"
   disp :: DispatchStatus
 
 text \<open>The following function helps abbreviate the construction of a thread state.\<close>
 
-fun tstate where "tstate tv ii ai ao io ds = 
- \<lparr> tvar= tv, infi= ii, appi= ai, appo= ao, info= io, disp= ds \<rparr>"
+fun tstate where "tstate ii ai ao io tv ds = 
+ \<lparr> infi= ii, appi= ai, appo= ao, info= io, tvar= tv, disp= ds \<rparr>"
 
 
 subsection \<open>Well-formedness Definitions\<close>
@@ -163,19 +163,19 @@ text \<open>The infi component of a ThreadState (input infrastructure port map)
    descriptor down to port well-formedness *)
 
 definition wf_ThreadState_infi:: "Model \<Rightarrow> CompId \<Rightarrow> ('a PortState) \<Rightarrow> bool" where
- "wf_ThreadState_infi m c ps \<equiv> wf_PortState ps {p . isInCIDPID m c p}" 
+ "wf_ThreadState_infi m c ps \<equiv> wf_PortState m {p . isInCIDPID m c p} ps" 
 
 text \<open>The definitions below for other port-state elements are similar.\<close>
 
 definition wf_ThreadState_appi:: "Model \<Rightarrow> CompId \<Rightarrow> ('a PortState) \<Rightarrow> bool" where
- "wf_ThreadState_appi m c ps \<equiv> wf_PortState ps {p . isInCIDPID m c p}"
+ "wf_ThreadState_appi m c ps \<equiv> wf_PortState m {p . isInCIDPID m c p} ps"
 
 
 definition wf_ThreadState_appo:: "Model \<Rightarrow> CompId \<Rightarrow> ('a PortState) \<Rightarrow> bool" where
- "wf_ThreadState_appo m c ps \<equiv> wf_PortState ps {p . isOutCIDPID m c p}"
+ "wf_ThreadState_appo m c ps \<equiv> wf_PortState m {p . isOutCIDPID m c p} ps"
 
 definition wf_ThreadState_info:: "Model \<Rightarrow> CompId \<Rightarrow> ('a PortState) \<Rightarrow> bool" where
- "wf_ThreadState_info m c ps \<equiv> wf_PortState ps {p . isOutCIDPID m c p}"
+ "wf_ThreadState_info m c ps \<equiv> wf_PortState m {p . isOutCIDPID m c p} ps"
 
 text \<open>If p is mentioned in the dispatch status of ts, then it must be an input port of c.
       ToDo: constrain to dispatch triggers, also check the relationship between 
@@ -188,11 +188,11 @@ subsubsection \<open>Well-formed Thread States\<close>
 
 definition wf_ThreadState:: "Model \<Rightarrow> CompId \<Rightarrow> ('a ThreadState) \<Rightarrow> bool"  
   where "wf_ThreadState m t ts \<equiv>
-   (wf_ThreadState_tvar m t (tvar ts)) \<and>
    (wf_ThreadState_infi m t (infi ts)) \<and>
    (wf_ThreadState_appi m t (appi ts)) \<and>
    (wf_ThreadState_appo m t (appo ts)) \<and>
    (wf_ThreadState_info m t (info ts)) \<and>
+   (wf_ThreadState_tvar m t (tvar ts)) \<and>
    (wf_ThreadState_disp m t (disp ts))"
 
 
@@ -245,7 +245,7 @@ text \<open>For each port state component of the thread state,
 the port state should be well-formed wrt the model and should be associated
 with an empty queue.\<close>
 
-(* ToDo: John: when the well-formedness requires for port states is extended to 
+(* ToDo: John: when the well-formedness requirements for port states is extended to 
 say that data ports always have a value in them, these definitions might need to 
 reflect that -- or we can simply let the initialization phase establish a basic 
 system invariant that all data port queues have exactly one value in them. *)
@@ -272,11 +272,11 @@ get the overall predicate for a valid initial thread state.\<close>
 
 definition initial_ThreadState:: "Model \<Rightarrow> CompId \<Rightarrow> (int ThreadState) \<Rightarrow> bool"  
   where "initial_ThreadState m t ts \<equiv>
-   (initial_ThreadState_tvar m t ts) \<and>
    (initial_ThreadState_infi m t ts) \<and>
    (initial_ThreadState_appi m t ts) \<and>
    (initial_ThreadState_appo m t ts) \<and>
    (initial_ThreadState_info m t ts) \<and>
+   (initial_ThreadState_tvar m t ts) \<and>
    (initial_ThreadState_disp m t ts)
   "
 
@@ -285,9 +285,9 @@ text \<open>The following lemma states that any initial thread state is well-for
 lemma initial_implies_wf:
   "\<lbrakk>initial_ThreadState m t ts\<rbrakk> \<Longrightarrow> wf_ThreadState m t ts"
   unfolding  initial_ThreadState_def  
-             initial_ThreadState_tvar_def initial_ThreadState_infi_def
-             initial_ThreadState_appi_def initial_ThreadState_appo_def
-             initial_ThreadState_info_def initial_ThreadState_disp_def
+             initial_ThreadState_infi_def initial_ThreadState_appi_def 
+             initial_ThreadState_appo_def initial_ThreadState_info_def 
+             initial_ThreadState_tvar_def initial_ThreadState_disp_def
              wf_ThreadState_def
   by blast
 

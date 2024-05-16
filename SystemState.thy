@@ -24,9 +24,11 @@ developer designs this code to provide an initial value to each variable
 in the thread's state and to put initial values on its output ports.
 
 In the Computing phase, the Compute Entry Point application code for each thread
-is executed repeated, according to the thread scheduling policy.\<close>
+is executed repeated, according to the thread scheduling policy.
 
-datatype Phase = Initializing | Computing
+The two phases are associated with dedicated scheduling information.
+See datatype @{term Exec} below.
+\<close>
 
 subsection \<open>Scheduling State Structures\<close>
 
@@ -52,9 +54,9 @@ are set up (a) as a minimal abstract representation of scheduling, with (b) the 
 the definition to a particular scheduling strategy.
 
 Our abstract scheduling information indicates that the system is either initializing threads
-according to a simple total order, or is in the Computing phase and with @{term CompId} 
-indicating the thread whose compute entry point will be executed next according to the underlying (unspecified)
-scheduling strategy.\<close>
+(with a list of ids of threads remaining to be initialized), 
+or is in the Computing phase and with @{term CompId} indicating the thread whose compute 
+entry point will be executed next according to the underlying (unspecified) scheduling strategy.\<close>
 
 datatype Exec = Initialize "CompId list" | Compute "CompId"
 
@@ -88,17 +90,30 @@ The system state includes the following elements:
 \item a mapping from @{term CompId} to the thread states, 
 \item an (abstract) representation of the state of the communication substrate,
 \item a mapping from @{term CompId} to the scheduling state of each thread,
-\item the current phase of the system, 
+\item the current phase of the system (contained in @{term Exec}, 
 \item the thread to be executed next. 
 \end{itemize}
 \<close>
 
+(* From John to Stefan: 
+        can we rename systemThread to systemThreadStates
+        can we rename systemState to systemThreadSchedulingStates or 
+                                     systemThreadSStates
+                                     systemSchedulingStates
+*)
 record ('u, 'a) SystemState =
-  systemThread :: "(CompId, 'a ThreadState) map"
-  systemComms :: "'u"
-  systemState :: "(CompId, ScheduleState) map" (* Each component is in a scheduling state *)
-  systemPhase :: "Phase"
-  systemExec :: "Exec" (* Thread to be executed next *)
+  systemThread :: "(CompId, 'a ThreadState) map" \<comment> \<open>states of each thread\<close>
+  systemComms :: "'u" \<comment> \<open>state of communication substrate\<close>
+  systemState :: "(CompId, ScheduleState) map" \<comment> \<open>schedule state of each thread\<close>
+  systemExec :: "Exec" \<comment> \<open>system state and thread to be executed next\<close>
+
+
+text \<open>Define an instantiation of the system state in which the communication substrate
+structure is defined as a set of communication packets with a source @{term PortId} 
+a payload, and a target @{term PortId}.\<close>
+
+type_synonym 'a CommonState = "('a, (PortId * 'a * PortId * nat) set) SystemState"
+
 
 text \<open>The following helper function uses the map @{term ran} (range) operation
 to retreive the set of thread states associated with all threads in the system 
@@ -107,9 +122,115 @@ state @{term s}.\<close>
 fun systemThreadStates :: "('u, 'a) SystemState \<Rightarrow> 'a ThreadState set"
   where "systemThreadStates s = ran (systemThread s)"
 
+
+text \<open>The following helper predicates can be used to determine the current
+phase of the system.
+\<close>
+
+text \<open>The system is in the initialization phase when the @{term systemPhase} field is 
+set to @{term Initializing} and the execution schedule field is set to an 
+initialization schedule.\<close>
+
+(* consider making these well-formedness properties, i.e., if the phase is Initializing,
+then the systemExec field references an initialization schedule *)
+
+fun isInitializing :: "('a, 'u) SystemState \<Rightarrow> bool"
+  where "isInitializing s = (\<exists>cs. systemExec s = Initialize cs)"
+
+text \<open>The system is in the compute phase when the @{term systemPhase} field is 
+set to @{term Computing} and the execution schedule field indicates that component
+@{term c} is the next to execute.\<close>
+
+fun isComputing :: "('a, 'u) SystemState \<Rightarrow> bool"
+  where "isComputing s = (\<exists>c. systemExec s = Compute c)"
+
+lemma init_not_compute: "isInitializing s \<Longrightarrow> \<not>isComputing s"
+  apply simp
+  by fastforce
+
+lemma compute_not_init: "isComputing s \<Longrightarrow> \<not>isInitializing s"
+  apply simp
+  by fastforce
+
+lemma init_init: "systemExec s = Initialize cs \<Longrightarrow> isInitializing s"
+  by simp
+
+lemma compute_compute: "systemExec s = Compute c \<Longrightarrow> isComputing s"
+  by simp
+
 subsection \<open>Well-formedness Definitions\<close>
 
-text \<open>The following definition gives well-formed conditions for system states:
+text \<open>
+This section define a notion of well-formed system state.  This
+is organized in terms of well-formedness properties for each system state element.  
+\<close>
+
+
+subsubsection \<open>Well-formedness Definitions for Thread States\<close>
+
+text \<open>
+The system state's thread state map is well-formed if each thread
+state in the map is well-formed and if the domain of the map
+equals the set of thread ids in the model.\<close>
+
+definition wf_SystemState_ThreadStates :: "Model \<Rightarrow> ('u, 'a) SystemState \<Rightarrow> bool"
+  where  "wf_SystemState_ThreadStates m ss \<equiv>
+           let threadStates = systemThread ss in 
+            \<forall>c \<in> dom threadStates . wf_ThreadState m c (threadStates $ c)" 
+
+definition wf_SystemState_ThreadStates_dom :: "Model \<Rightarrow> ('u, 'a) SystemState \<Rightarrow> bool"
+  where  "wf_SystemState_ThreadStates_dom m ss \<equiv> 
+           let threadStates = systemThread ss in
+            dom threadStates = modelCIDs m" 
+
+text \<open>
+***** ToDo ****** communication state.
+\<close>
+
+text \<open>
+The system state's thread schedule state map is well-formed if the domain of the map
+equals the set of thread ids in the model.\<close>
+
+definition wf_SystemState_ScheduleStates_dom :: "Model \<Rightarrow> ('u, 'a) SystemState \<Rightarrow> bool"
+  where  "wf_SystemState_ScheduleStates_dom m ss \<equiv> 
+           let scheduleStates = systemState ss in
+            dom scheduleStates = modelCIDs m" 
+
+
+(* From John to Stefan: is there any reason why we should not have equality below,
+   i.e., dom of systemThreads is equal to modelCIDs? *)
+
+(* The following is a candidate for elimination, because it is subsumed by the 
+   broader system state well-formed properties *)
+
+definition wf_SystemState where "wf_SystemState m x \<equiv> dom (systemThread x) \<subseteq> modelCIDs m"
+
+text \<open>Well-formedness for @{type Exec} indicates that (a) when in the Initializing
+phase the list of thread ids yet to be initialized are found in the thread ids of the model.
+and (b) when in the Compute phase the id of the next thread to execute is found in the
+thread ids of the model.\<close>
+
+definition wf_Exec :: "Model \<Rightarrow> Exec \<Rightarrow> bool"
+  where "wf_Exec m e \<equiv> 
+          case e of 
+           Initialize cs \<Rightarrow> set cs \<subseteq> (modelCIDs m)
+         | Compute c \<Rightarrow> c \<in> (modelCIDs m)"
+
+
+text \<open>
+Well-formedness of the system state is the conjunction of the well-formed properties
+above.
+\<close>
+
+definition wf_SystemStateJohn :: "Model \<Rightarrow> ('u, 'a) SystemState \<Rightarrow> bool"
+  where "wf_SystemStateJohn m ss \<equiv> 
+          wf_SystemState_ThreadStates m ss
+        \<and> wf_SystemState_ThreadStates_dom m ss
+        \<and> wf_SystemState_ScheduleStates_dom m ss
+        \<and> wf_Exec m (systemExec ss)"
+
+
+text \<open>The following definition gives well-formed conditions for system schedules:
 \begin{itemize}
 \item the thread ids referenced in the initialization phase schedule, must match
 exactly the set of thread ids in the model (i.e., those for which a model descriptor
@@ -135,30 +256,17 @@ and every model-declared thread has an entry in the map.
     saying that certain threads don't have a successor.  *)
 
 definition wf_SystemSchedule :: "Model \<Rightarrow> SystemSchedule \<Rightarrow> bool"
-  where "wf_SystemSchedule md sch \<equiv> 
-  (set (scheduleInit sch) = dom (modelCompDescrs md)) \<and>
-  (length (scheduleInit sch) = card (dom (modelCompDescrs md))) \<and>
-  (scheduleFirst sch \<noteq> {}) \<and>
-  (scheduleFirst sch \<subseteq> dom (modelCompDescrs md)) \<and>
-  (dom (scheduleComp sch) = dom (modelCompDescrs md))"
-
-(** ? ? ? **)
-
-type_synonym 'a CommonState = "('a, (PortId * 'a * PortId * nat) set) SystemState"
-
-text \<open>The following helper predicates can be used to determine the current
-phase of the system.
-\<close>
-
-fun isInitializing :: "('a, 'u) SystemState \<Rightarrow> bool"
-  where "isInitializing s = (systemPhase s = Initializing \<and> (\<exists>cs. systemExec s = Initialize cs))"
-
-fun isComputing :: "('a, 'u) SystemState \<Rightarrow> bool"
-  where "isComputing s = (systemPhase s = Computing \<and> (\<exists>c. systemExec s = Compute c))"
+  where "wf_SystemSchedule md sc \<equiv> 
+  (set (scheduleInit sc) = dom (modelCompDescrs md)) \<and>
+  (length (scheduleInit sc) = card (dom (modelCompDescrs md))) \<and>
+  (scheduleFirst sc \<noteq> {}) \<and>
+  (scheduleFirst sc \<subseteq> dom (modelCompDescrs md)) \<and>
+  (dom (scheduleComp sc) = dom (modelCompDescrs md))"
 
 (* Should we move the communication definitions into their own theory? *)
 
 subsection \<open>Communication\<close>
+
 
 record ('u,'a) Communication =
   comPush :: "'u \<Rightarrow> 'a PortState \<Rightarrow> Conns \<Rightarrow> ('u \<times> 'a PortState) set" 

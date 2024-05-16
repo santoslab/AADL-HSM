@@ -29,7 +29,8 @@ aspects of the semantics.\<close>
 
 datatype Strategy = DropEarliest | DropLatest | Error | Unbounded
 
-(* To Do: reconcile the terms "Strategy", "Overflow Handling Policy" *)
+text \<open>\edcomment{ToDo: reconcile the terms "Strategy", "Overflow Handling Protocol"}\<close>
+
 
 text \<open>Define a record type to represent queue values with the following fields:
 \begin{itemize}
@@ -58,9 +59,9 @@ record 'a Queue =
   capacity :: nat
   strategy :: Strategy
 
-(* ToDo John: reconcile the terms "capacity", "size", "max_size", etc. used
-in AADL standard, Model.thy, Queue.thy *)
-
+text \<open>\edcomment{ToDo: double-check the terminology in the AADL standard and
+reconcile the terms "capacity", "size", "maxsize", etc. used
+in AADL standard, Model.thy, Queue.thy}\<close>
 
 text \<open>Create a queue initialised with given buffer, capacity and strategy\<close>
 fun mk_queue :: "'a list \<Rightarrow> nat \<Rightarrow> Strategy \<Rightarrow> 'a Queue"
@@ -89,19 +90,21 @@ qed
 
 end
 
-text \<open>ToDo Stefan: indicate ordering on lists are used in theory/proofs.\<close>
+text \<open>
+\edcomment{ToDo Stefan: indicate ordering on lists are used in theory/proofs.
+Also explain what the Isabelle constructs above are, e.g., is this an instantiation
+of a type class?}
+\<close>
 
 
 subsection \<open>Well-formedness Definitions\<close>
 
-text \<open>A queue is well-formed if the length of the before conforms to the capacity
+text \<open>A queue is well-formed if the length of the buffer conforms to the capacity
 value.\<close>
 
 definition wf_Queue 
-  where "wf_Queue q \<equiv> strategy q \<noteq> Unbounded \<longrightarrow> length (buffer q) \<le> capacity q"
-
-text \<open>ToDo: Add well-formedness properties that constrain the strategy and capacity
-fields to match what is in the port descr for the port.\<close>
+  where "wf_Queue q \<equiv> (0 < capacity q) \<and> 
+                      (strategy q \<noteq> Unbounded \<longrightarrow> length (buffer q) \<le> capacity q)"
 
 subsection \<open>Operations\<close>
 
@@ -110,7 +113,8 @@ work on the buffer field of the record representing the queue.\<close>
 
 text \<open>Check if the queue is empty.\<close>
 
-fun isEmpty :: "'a Queue \<Rightarrow> bool" where "isEmpty q = (buffer q = [])"
+fun isEmpty :: "'a Queue \<Rightarrow> bool" 
+  where "isEmpty q = (buffer q = [])"
 
 text \<open>Check if the queue has exactly one element.\<close>
 
@@ -134,7 +138,7 @@ fun push :: "'a Queue \<Rightarrow> 'a \<Rightarrow> 'a Queue" where
       DropEarliest \<Rightarrow> 
         (if length (buffer q) < capacity q 
           then q \<lparr> buffer:= buffer q @ [a] \<rparr> 
-          else q \<lparr> buffer:= tl (buffer q) @ [a] \<rparr>)
+          else q \<lparr> buffer:= tl (buffer q) @ [a] \<rparr>) 
     | DropLatest \<Rightarrow> 
         (if length (buffer q) < capacity q 
           then q \<lparr> buffer:= buffer q @ [a] \<rparr> 
@@ -183,6 +187,10 @@ text \<open>{\bf head} Properties\<close>
 lemma single_queue_head: "buffer q = [a] \<Longrightarrow> head q = a"
   by simp
 
+(*------------------------
+   t a i l   properties
+ ------------------------*)
+
 text \<open>{\bf tail} Properties\<close>
 
 text \<open>@{term tail} frame properties.  The @{term tail} doesn't change the @{term error},
@@ -202,32 +210,34 @@ text \<open>@{term tail} preserves well-formedness.\<close>
 lemma tail_wf:
   assumes "wf_Queue q"
   shows "wf_Queue (tail q)"
-  using assms apply (simp add: wf_Queue_def)
-  using diff_le_self dual_order.trans by blast
-
-
+  using assms by (auto simp add: wf_Queue_def)
+ 
 lemma single_queue_tail: "buffer q = [a] \<Longrightarrow> buffer (tail q) = []"
   by simp
+
+(*------------------------
+   p u s h    properties
+ ------------------------*)
 
 text \<open>{\bf push} Properties\<close>
 
 text \<open>@{term push} doesn't change the @{term capacity} field.\<close>
 
 lemma push_frame_capacity: "capacity (push q a) = capacity q"
+  by (cases "(strategy q)"; simp)
+
+(*
   apply (simp; rule conjI)
    apply (metis (no_types, lifting) Strategy.exhaust Strategy.simps(13) Strategy.simps(14) 
          Strategy.simps(15) Strategy.simps(16) select_convs(3) surjective update_convs(2))
   by (metis (no_types, lifting) Strategy.exhaust Strategy.simps(13) Strategy.simps(14) 
      Strategy.simps(15) Strategy.simps(16) select_convs(3) surjective update_convs(1) update_convs(2))
+*)
 
 text \<open>@{term push} doesn't change the @{term strategy} field.\<close>
 
 lemma push_frame_strategy: "strategy (push q a) = strategy q"
-  apply (simp; rule conjI)
-   apply (metis (no_types, lifting) Strategy.exhaust Strategy.simps(13) Strategy.simps(14) 
-         Strategy.simps(15) Strategy.simps(16) ext_inject surjective update_convs(2))
-  by (metis (no_types, lifting) Strategy.exhaust Strategy.simps(13) Strategy.simps(14) 
-     Strategy.simps(15) Strategy.simps(16) ext_inject surjective update_convs(1) update_convs(2))
+  by (cases "(strategy q)"; simp)
 
 text \<open>Express the transformation of @{term push} on the buffer when the operation won't 
 cause the capacity to be exceeded.\<close>
@@ -235,10 +245,14 @@ cause the capacity to be exceeded.\<close>
 lemma push_within_capacity:
   assumes "length (buffer q) < capacity q"
   shows "buffer (push q a) = buffer q @ [a]"
+  using assms by (cases "(strategy q)"; simp)
+
+(*
   apply (simp; rule conjI)
    apply (metis (no_types, lifting) Strategy.exhaust Strategy.simps(13) Strategy.simps(14) 
          Strategy.simps(15) Strategy.simps(16) select_convs(2) surjective update_convs(2))
   using assms by blast
+*)
 
 text \<open>Express the transformation of @{term push} on the error flag when the operation won't 
 cause the capacity to be exceeded.\<close>
@@ -246,10 +260,46 @@ cause the capacity to be exceeded.\<close>
 lemma push_no_error:
   assumes "length (buffer q) < capacity q"
   shows "error (push q a) = error q"
+  using assms by (cases "(strategy q)"; simp)
+
+(*
   apply (simp; rule conjI; clarify)
    apply (smt (verit, best) Strategy.exhaust Strategy.simps(13) Strategy.simps(14) 
          Strategy.simps(15) Strategy.simps(16) ext_inject surjective update_convs(2))
   using assms by blast
+*)
+
+(* 
+   Historical note: (from John):  
+   I was originally trying to prove the following
+   property (push preserves wf) 
+
+    lemma push_wf:
+    assumes "wf_Queue q"
+    shows "wf_Queue (push q v)"
+
+   without the capacity q > 0 condition
+   in wf_Queue. This fails for the DropEarliest case, because tail [] = []
+   so pushing a value on an empty queue will exceed the capacity of 0. 
+
+   Interestingly, this issue was revealed to me by QuickCheck as shown below.
+
+proof (prove)
+goal (1 subgoal):
+ 1. wf_Queue (push q v) 
+Auto Quickcheck found a counterexample:
+  q = \<lparr>error = True, buffer = [], capacity = 0, strategy = DropEarliest\<rparr>
+  v = a\<^sub>1
+ *)
+
+lemma push_wf:
+  assumes "wf_Queue q"
+  shows "wf_Queue (push q v)"
+using assms by (cases "(strategy q)"; auto simp add: wf_Queue_def)
+
+(*------------------------
+   d r o p    properties
+ ------------------------*)
 
 text \<open>{\bf drop} Properties\<close>
 
@@ -270,8 +320,11 @@ text \<open>@{term tail} preserves well-formedness.\<close>
 lemma drop_wf:
   assumes "wf_Queue q"
   shows "wf_Queue (drop n q)"
-  apply (simp add: wf_Queue_def)
-  using assms wf_Queue_def by fastforce
+  using assms by (auto simp add: wf_Queue_def)
+
+(*------------------------
+  c l e a r    properties
+ ------------------------*)
 
 text \<open>{\bf clear} Properties\<close>
 
@@ -290,8 +343,14 @@ lemma clear_frame_strategy: "strategy (clear q) = strategy q"
 text \<open>@{term tail} preserves well-formedness.\<close>
 
 lemma clear_wf:
+  assumes "wf_Queue q"
   shows "wf_Queue (clear q)"
-  by (simp add: wf_Queue_def)
+  using assms by (simp add: wf_Queue_def)
+  
+
+(*----------------------------------
+   s e t B u f f e r    properties
+ -----------------------------------*)
 
 text \<open>{\bf setBuffer} Properties\<close>
 
@@ -307,17 +366,13 @@ lemma setBuffer_frame_capacity: "capacity (setBuffer q b) = capacity q"
 lemma setBuffer_frame_strategy: "strategy (setBuffer q b) = strategy q"
   by simp
 
-text \<open>ToDo: Stefan: based on the way the operation is set up, it seems
-like the queue can get into a bad state where the length of the buffer
-can exceed the capacity.  That is, this operation doesn't seem to behave
-the same in error situations as push.\<close>
-
-text \<open>@{term tail} preserves well-formedness.\<close>
+text \<open>@{term setBuffer} preserves well-formedness.\<close>
 
 lemma setBuffer_wf:
-  assumes "length b \<le> capacity q"
-  shows "wf_Queue (setBuffer q b)"
-  by (simp add: assms wf_Queue_def)
+  assumes "wf_Queue q"
+     and  "length b \<le> capacity q"
+   shows "wf_Queue (setBuffer q b)"
+  using assms by (simp add: wf_Queue_def)
 
 
 end

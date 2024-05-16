@@ -9,6 +9,9 @@ Given a system model in the AADL sublanguage processed by HAMR,
 HAMR can generate instances of the types defined in this theory.  This provides the
 basis for proving properties about system's structure and behavior. 
 
+\edcomment{ToDo: Describe the distinction between the instance model and the 
+         information presented here.}
+
 The theory uses Isabelle's Set and Map theories to represent model structures,
 but includes some additional helper functions in the SetsAndMaps theory.\<close>
 
@@ -50,7 +53,9 @@ subsection "Variable Identifiers @{term CompId}"
 text \<open>Variable identifiers are also similar to port identifiers, except that strings are used 
      for readability instead of numbers. \<close>
 
-text \<open>ToDo: Rename the following to VarId and VarIds to match the other ID domains.\<close>
+text \<open>
+\edcomment{ToDo: Rename the following to VarId and VarIds to match 
+the other ID domains.}\<close>
 
 datatype Var = Var string
 
@@ -109,8 +114,9 @@ record PortDescr =
   compId :: "CompId" 
   direction :: PortDirection
   kind :: PortKind
-  size :: "nat"    (* ToDo: Add system property Max_Queue_Size *)
-  urgency :: "nat"  (* ToDo: Add system property Max_Urgency *)
+  size :: "nat"    (* ToDo (from John): Assess if we should do a better job reconciling this field name with AADL property Max_Queue_Size *)
+  urgency :: "nat"  (* ToDo (from John): Assess if we should do a better job reconciling this field name with AADL property Max_Queue_Size *)
+  (* ToDo (from John): Add port overflow stategy and connect this field with the strategy in Queue *)
 
 subsection \<open>Port Descriptor Well-formedness\<close>
 
@@ -261,6 +267,10 @@ record Model =
  
 text \<open>A helper function for abbreviating the construction of model structures.\<close>
 
+text \<open>\edcomment{I'm pretty sure I saw a built-in notation for this in the 
+      Isabelle tutorial (i.e., check to see if we can use the built in
+      notation and avoid making our own everywhere.}\<close>
+
 fun mkModel where "mkModel compdescrs portdescrs conns = 
   \<lparr> modelCompDescrs= compdescrs,  modelPortDescrs= portdescrs,  
     modelConns= conns \<rparr>"
@@ -281,13 +291,21 @@ The first set of helper functions are queries across an entire
 model (not limited to a particular component).
 \<close>
 
+text \<open>Return the component identifiers in model m.\<close>
+fun modelCIDs:: "Model \<Rightarrow> CompId set"
+  where "modelCIDs m = dom (modelCompDescrs m)"
+
+text \<open>Return the port identifiers in model m.\<close>
+fun modelPIDs:: "Model \<Rightarrow> PortId set"
+  where "modelPIDs m = dom (modelPortDescrs m)"
+
 text \<open>Does model m include a component (id) c?\<close>
 fun inModelCID :: "Model \<Rightarrow> CompId \<Rightarrow> bool"
-  where "inModelCID m c = (c \<in> dom (modelCompDescrs m))"
+  where "inModelCID m c = (c \<in> modelCIDs m)"
 
 text \<open>Does model m include a port (id) p?\<close>
 fun inModelPID :: "Model \<Rightarrow> PortId \<Rightarrow> bool" 
-  where "inModelPID m p = (p \<in> dom (modelPortDescrs m))"
+  where "inModelPID m p = (p \<in> modelPIDs m)"
 
 text \<open>Does model m include a input port (id) p?\<close>
 fun isInPID :: "Model \<Rightarrow> PortId \<Rightarrow> bool" 
@@ -297,11 +315,11 @@ text \<open>Does model m include an output port (id) p?\<close>
 fun isOutPID :: "Model \<Rightarrow> PortId \<Rightarrow> bool"
   where "isOutPID m p = (direction (modelPortDescrs m $ p) = Out)"
 
-text \<open>Does model m include a port (id) p with queue size n?\<close>
+text \<open>Does model m include a port (id) p with queue capacity n?\<close>
 fun isSizePID :: "Model \<Rightarrow> PortId \<Rightarrow> nat \<Rightarrow> bool"
   where "isSizePID m p n = (size (modelPortDescrs m $ p) = n)"
 
-text \<open>Return the queue size of port (id) p in model m.\<close>
+text \<open>Return the queue capacity of port (id) p in model m.\<close>
 fun sizePID :: "Model \<Rightarrow> PortId \<Rightarrow> nat"
   where "sizePID m p = (size (modelPortDescrs m $ p))"
 
@@ -517,7 +535,7 @@ definition wf_Model_InDataPorts :: "Model \<Rightarrow> bool"
   where "wf_Model_InDataPorts m \<equiv>
   (\<forall>p \<in> dom (modelPortDescrs m). 
       (isInPID m p) \<and> (isDataPD (modelPortDescrs m $ p)) 
-          \<longrightarrow> (sizePID m p) \<le> 1)"
+          \<longrightarrow> (sizePID m p) \<le> 1)" (* ToDo: seems like this is redundant with wf_PortDescr *)
 
 text \<open>For each entry (c:: CompId, cd:: CompDescr) in the component descriptors map, 
 if c is Sporadic, then cd's dispatchTriggers is non-empty.
@@ -570,5 +588,39 @@ might occasionally needed to be assumed explicitly.\<close>
 
 definition finite_Model :: "Model \<Rightarrow> bool"
   where "finite_Model m \<equiv> finite (dom (modelCompDescrs m)) \<and> finite (dom (modelPortDescrs m))"
+
+(*========= M o d e l   W e l l f o r m e d n e s s   P r o p e r t i e s  ===========*)
+
+section \<open>Properties Derived from Well-formedness\<close>
+
+lemma wf_model_implies_data_ports_capacity: 
+  assumes wf_m: "wf_Model m"
+      and p_in_m: "p \<in> dom (modelPortDescrs m)"
+      and p_is_dataport: "isDataPID m p"
+    shows "(sizePID m p) = 1"
+proof - 
+  from p_is_dataport have h1: "(kind (modelPortDescrs m $ p)) = Data" by auto 
+  from wf_m have h2: "wf_Model_PortDescr m" unfolding wf_Model_def by auto
+  from h2 have h3: "wf_PortDescr ((modelPortDescrs m) $ p)" by (simp add: p_in_m wf_Model_PortDescr_def)
+  from h3 h1 show ?thesis by (simp add: wf_PortDescr_def)
+qed
+
+lemma  
+  assumes wf_m: "wf_Model m"
+      and p_in_m: "p \<in> dom (modelPortDescrs m)"
+      and p_is_dataport: "isDataPID m p"
+    shows "(sizePID m p) = 1"
+proof - 
+  from p_is_dataport have h1: "(kind (modelPortDescrs m $ p)) = Data" by auto 
+  from wf_m have h3: "wf_PortDescr ((modelPortDescrs m) $ p)" 
+    by (auto simp add: p_in_m wf_Model_def wf_Model_PortDescr_def wf_PortDescr_def)
+  from h3 h1 show ?thesis by (simp add: wf_PortDescr_def)
+qed
+
+lemma  
+ "\<lbrakk>wf_Model m; isDataPID m p\<rbrakk> \<Longrightarrow> p \<in> dom (modelPortDescrs m)"
+  apply (auto simp add: wf_Model_def wf_Model_PortDescr_def wf_PortDescr_def)   
+  sorry
+
 
 end

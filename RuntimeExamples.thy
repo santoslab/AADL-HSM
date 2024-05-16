@@ -49,8 +49,8 @@ definition compA_disp_initial:: "DispatchStatus" where [simp add]:
 
 definition compA_initial:: "int ThreadState" where [simp add]:
  "compA_initial = 
-   (tstate compA_tvar_initial 
-           compA_infi_initial compA_appi_initial compA_appo_initial compA_info_initial 
+   (tstate compA_infi_initial compA_appi_initial compA_appo_initial compA_info_initial
+           compA_tvar_initial 
            compA_disp_initial)"
 
 (*
@@ -91,14 +91,14 @@ definition compB_disp_initial:: "DispatchStatus" where [simp add]:
 
 definition compB_initial:: "int ThreadState" where [simp add]:
  "compB_initial = 
-   (tstate compB_tvar_initial 
-           compB_infi_initial compB_appi_initial compB_appo_initial compB_info_initial 
+   (tstate compB_infi_initial compB_appi_initial compB_appo_initial compB_info_initial 
+           compB_tvar_initial
            compB_disp_initial)"
 
 lemma compA_initial_prop: "initial_ThreadState sysModel AId compA_initial" 
   by  (auto simp add: 
                     wf_VarState_def wf_VarState_dom_def 
-                    wf_PortState_def wf_PortState_dom_def wf_PortState_queues_def
+                    wf_PortState_def wf_PortState_dom_def wf_PortState_queue_def wf_PortState_queues_def
                     wf_Queue_def
                     initial_ThreadState_def 
                     initial_ThreadState_tvar_def wf_ThreadState_tvar_def 
