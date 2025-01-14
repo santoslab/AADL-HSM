@@ -203,7 +203,11 @@ definition wf_SystemState_ScheduleStates_dom :: "Model \<Rightarrow> ('u, 'a) Sy
 (* The following is a candidate for elimination, because it is subsumed by the 
    broader system state well-formed properties *)
 
-definition wf_SystemState where "wf_SystemState m x \<equiv> dom (systemThread x) \<subseteq> modelCIDs m"
+definition wf_SystemState :: "Model \<Rightarrow> ('u, 'a) SystemState \<Rightarrow> bool" 
+  where "wf_SystemState m x \<equiv> 
+    dom (systemThread x) \<subseteq> modelCIDs m \<and>
+    wf_SystemState_ThreadStates m x \<and>
+    wf_SystemState_ThreadStates_dom m x"
 
 text \<open>Well-formedness for @{type Exec} indicates that (a) when in the Initializing
 phase the list of thread ids yet to be initialized are found in the thread ids of the model.
@@ -267,10 +271,18 @@ definition wf_SystemSchedule :: "Model \<Rightarrow> SystemSchedule \<Rightarrow
 
 subsection \<open>Communication\<close>
 
-
 record ('u,'a) Communication =
   comPush :: "'u \<Rightarrow> 'a PortState \<Rightarrow> Conns \<Rightarrow> ('u \<times> 'a PortState) set" 
   comPull :: "'u \<Rightarrow> 'a PortState \<Rightarrow> Conns \<Rightarrow> ('u \<times> 'a PortState) set"
+
+definition wf_Communication where
+  "wf_Communication md cm \<equiv> 
+    (\<forall>sb ps. \<forall>c\<in>dom (modelCompDescrs md).
+      wf_ThreadState_info md c ps \<longrightarrow> 
+        (\<forall>(tb, qs)\<in>comPush cm sb ps (modelConns md). wf_ThreadState_info md c qs)) \<and>
+    (\<forall>sb ps. \<forall>c\<in>dom (modelCompDescrs md).
+      wf_ThreadState_infi md c ps \<longrightarrow> 
+        (\<forall>(tb, qs)\<in>comPull cm sb ps (modelConns md). wf_ThreadState_infi md c qs))"
 
 fun commonPushItems where
   "commonPushItems _ _ [] _ = {}"
@@ -313,7 +325,7 @@ fun commonPull where
     qids \<subseteq> dom ps \<and>
     (\<forall>q \<in> qids. qf q \<subseteq> { (p, x, q', n) \<in> sb . q = q'}) \<and>
     (\<forall>q \<in> UNIV - qids. qf q = {}) \<and>
-    (\<forall>q \<in> qids. card (qf q) + length (buffer (ps $ q)) \<le> capacity (ps $ q)) \<and>
+    (\<forall>q \<in> qids. card (qf q) + length (buffer (ps $ q)) \<le> qsize (ps $ q)) \<and>
     tb = commonPullSubstrate sb qf \<and>
     qs \<in> commonPullQueues ps qf}"
 

@@ -1,4 +1,4 @@
-section \<open>Queues\<close>
+section \<open>Queues \label{sec:queues}\<close>
 
 text \<open>In the AADL runtime, buffered storage for event and event data ports is represented
 using queues. To obtain a uniform storage representation for ports (which simplifies the semantics), 
@@ -17,19 +17,10 @@ to insert a value into a full queue.
 \<close>
 
 theory Queue
-  imports Main
+  imports Main Model
 begin
 
 subsection \<open>Structures\<close>
-
-text \<open>Define a datatype to represent the three options for 
-AADL's port Overflow\_Handling\_Protocol (OHP) property.  Add an additional
-Unbounded option for simplicity to be used when prototyping various 
-aspects of the semantics.\<close>
-
-datatype Strategy = DropEarliest | DropLatest | Error | Unbounded
-
-text \<open>\edcomment{ToDo: reconcile the terms "Strategy", "Overflow Handling Protocol"}\<close>
 
 
 text \<open>Define a record type to represent queue values with the following fields:
@@ -37,17 +28,17 @@ text \<open>Define a record type to represent queue values with the following fi
 \item error -- when the OHP is set to Error, this field is used to indicate
       that the queue is in an error state.
 \item buffer -- the representation of queue storage
-\item capacity -- [static] the maximum number of elements that the buffer 
+\item qsize -- [static] the maximum number of elements that the buffer 
                   (queue) can hold.  The value for this field should be equal to the 
                   Queue\_Size port property in the AADL model (default is 1), which
                   is held in the @{term PortDescr} from Model.thy.   If the OHP is 
                   unbounded, this value is ignored.
-\item strategy -- [static] the OHP for the queue.  The value for this field should be equal to the 
-                  OHP port property in the AADL model (default is DropEarliest), which
+\item qohp -- [static] the OHP for the queue.  The value for this field should be equal to the 
+                  OHP port property in the AADL model (default is DropOldest), which
                   is held in the @{term PortDescr} from Model.thy 
 \end{itemize}
 
-Fields marked \emph{static} are set at the creation time for the record and do not "change"
+Fields marked \emph{static} are set at the creation time for the record and do not ``change''
 (are preserved as copies are made of the record) during system execution.  An alternative
 design for the formalism would be to always have the Model/PortDescr available and reference
 the static fields directly from the model information.
@@ -56,20 +47,16 @@ the static fields directly from the model information.
 record 'a Queue =
   error :: bool
   buffer :: "'a list"
-  capacity :: nat
-  strategy :: Strategy
-
-text \<open>\edcomment{ToDo: double-check the terminology in the AADL standard and
-reconcile the terms "capacity", "size", "maxsize", etc. used
-in AADL standard, Model.thy, Queue.thy}\<close>
+  qsize :: nat
+  qohp :: OverflowHandlingProtocol
 
 text \<open>Create a queue initialised with given buffer, capacity and strategy\<close>
-fun mk_queue :: "'a list \<Rightarrow> nat \<Rightarrow> Strategy \<Rightarrow> 'a Queue"
-  where "mk_queue b c s = \<lparr> error= False, buffer= b, capacity= c, strategy= s \<rparr>"
+fun mk_queue :: "'a list \<Rightarrow> nat \<Rightarrow> OverflowHandlingProtocol \<Rightarrow> 'a Queue"
+  where "mk_queue b qs op = \<lparr> error= False, buffer= b, qsize= qs, qohp= op \<rparr>"
 
 text \<open>Create a queue initialised with an empty buffer, capacity and strategy\<close>
-fun mk_empty_queue :: "nat \<Rightarrow> Strategy \<Rightarrow> 'a Queue"
-  where "mk_empty_queue c s = \<lparr> error= False, buffer= [], capacity= c, strategy= s \<rparr>"
+fun mk_empty_queue :: "nat \<Rightarrow> OverflowHandlingProtocol \<Rightarrow> 'a Queue"
+  where "mk_empty_queue qs op = \<lparr> error= False, buffer= [], qsize= qs, qohp= op \<rparr>"
 
 text \<open>The following definitions define an order on list values.\<close>
 
@@ -103,8 +90,8 @@ text \<open>A queue is well-formed if the length of the buffer conforms to the c
 value.\<close>
 
 definition wf_Queue 
-  where "wf_Queue q \<equiv> (0 < capacity q) \<and> 
-                      (strategy q \<noteq> Unbounded \<longrightarrow> length (buffer q) \<le> capacity q)"
+  where "wf_Queue q \<equiv> (0 < qsize q) \<and> 
+                      (qohp q \<noteq> Unbounded \<longrightarrow> length (buffer q) \<le> qsize q)"
 
 subsection \<open>Operations\<close>
 
@@ -125,7 +112,7 @@ text \<open>Return the head (first value) from the queue.\<close>
 fun head :: "'a Queue \<Rightarrow> 'a" 
   where "head q = hd (buffer q)"
 
-text \<open>Take the tail of a queue.\<close>
+text \<open>Return the tail of a queue.\<close>
 
 fun tail :: "'a Queue \<Rightarrow> 'a Queue"
   where "tail q = q \<lparr> buffer:= tl (buffer q) \<rparr>"
@@ -134,17 +121,17 @@ text \<open>Enqueue a single value.\<close>
 
 fun push :: "'a Queue \<Rightarrow> 'a \<Rightarrow> 'a Queue" where 
   "push q a = 
-    (case strategy q of
-      DropEarliest \<Rightarrow> 
-        (if length (buffer q) < capacity q 
+    (case qohp q of
+      DropOldest \<Rightarrow> 
+        (if length (buffer q) < qsize q 
           then q \<lparr> buffer:= buffer q @ [a] \<rparr> 
           else q \<lparr> buffer:= tl (buffer q) @ [a] \<rparr>) 
-    | DropLatest \<Rightarrow> 
-        (if length (buffer q) < capacity q 
+    | DropNewest \<Rightarrow> 
+        (if length (buffer q) < qsize q 
           then q \<lparr> buffer:= buffer q @ [a] \<rparr> 
           else q)
     | Error \<Rightarrow> 
-        (if length (buffer q) < capacity q 
+        (if length (buffer q) < qsize q 
           then q \<lparr> buffer:= buffer q @ [a] \<rparr> 
           else q \<lparr> error:= True, buffer:= [] \<rparr>)
     | Unbounded \<Rightarrow> q \<lparr> buffer:= buffer q @ [a] \<rparr>)"
@@ -153,13 +140,13 @@ text \<open>Enqueue a list of values.\<close>
 
 fun pushQueue :: "'a Queue \<Rightarrow> 'a list \<Rightarrow> 'a Queue" where 
   "pushQueue q q' = 
-    (case strategy q of
-      DropEarliest \<Rightarrow> 
-        q \<lparr> buffer:= drop (length (buffer q @ q') - capacity q) (buffer q @ q') \<rparr>
-    | DropLatest \<Rightarrow> 
-        q \<lparr> buffer:= take (capacity q) (buffer q @ q') \<rparr>
+    (case qohp q of
+      DropOldest \<Rightarrow> 
+        q \<lparr> buffer:= drop (length (buffer q @ q') - qsize q) (buffer q @ q') \<rparr>
+    | DropNewest \<Rightarrow> 
+        q \<lparr> buffer:= take (qsize q) (buffer q @ q') \<rparr>
     | Error \<Rightarrow> 
-        (if length (buffer q @ q') \<le> capacity q 
+        (if length (buffer q @ q') \<le> qsize q 
           then q \<lparr> buffer:= buffer q @ q' \<rparr> 
           else q \<lparr> error:= True, buffer:= [] \<rparr>)
     | Unbounded \<Rightarrow> q \<lparr> buffer:= buffer q @ q' \<rparr>)"
@@ -199,10 +186,10 @@ text \<open>@{term tail} frame properties.  The @{term tail} doesn't change the 
 lemma tail_frame_error: "error (tail q) = error q"
   by simp
 
-lemma tail_frame_capacity: "capacity (tail q) = capacity q"
+lemma tail_frame_qsize: "qsize (tail q) = qsize q"
   by simp
 
-lemma tail_frame_strategy: "strategy (tail q) = strategy q"
+lemma tail_frame_qohp: "qohp (tail q) = qohp q"
   by simp
 
 text \<open>@{term tail} preserves well-formedness.\<close>
@@ -221,53 +208,33 @@ lemma single_queue_tail: "buffer q = [a] \<Longrightarrow> buffer (tail q) = []"
 
 text \<open>{\bf push} Properties\<close>
 
-text \<open>@{term push} doesn't change the @{term capacity} field.\<close>
+text \<open>@{term push} doesn't change the @{term qsize} field.\<close>
 
-lemma push_frame_capacity: "capacity (push q a) = capacity q"
-  by (cases "(strategy q)"; simp)
+lemma push_frame_qsize: "qsize (push q a) = qsize q"
+  by (cases "(qohp q)"; simp)
 
-(*
-  apply (simp; rule conjI)
-   apply (metis (no_types, lifting) Strategy.exhaust Strategy.simps(13) Strategy.simps(14) 
-         Strategy.simps(15) Strategy.simps(16) select_convs(3) surjective update_convs(2))
-  by (metis (no_types, lifting) Strategy.exhaust Strategy.simps(13) Strategy.simps(14) 
-     Strategy.simps(15) Strategy.simps(16) select_convs(3) surjective update_convs(1) update_convs(2))
-*)
 
-text \<open>@{term push} doesn't change the @{term strategy} field.\<close>
+text \<open>@{term push} doesn't change the @{term qohp} field.\<close>
 
-lemma push_frame_strategy: "strategy (push q a) = strategy q"
-  by (cases "(strategy q)"; simp)
+lemma push_frame_qohp: "qohp (push q a) = qohp q"
+  by (cases "(qohp q)"; simp)
 
-text \<open>Express the transformation of @{term push} on the buffer when the operation won't 
+text \<open>Express the transformation of @{term push} on the buffer when the operation doesn't 
 cause the capacity to be exceeded.\<close>
 
-lemma push_within_capacity:
-  assumes "length (buffer q) < capacity q"
+lemma push_within_qsize:
+  assumes "length (buffer q) < qsize q"
   shows "buffer (push q a) = buffer q @ [a]"
-  using assms by (cases "(strategy q)"; simp)
+  using assms by (cases "(qohp q)"; simp)
 
-(*
-  apply (simp; rule conjI)
-   apply (metis (no_types, lifting) Strategy.exhaust Strategy.simps(13) Strategy.simps(14) 
-         Strategy.simps(15) Strategy.simps(16) select_convs(2) surjective update_convs(2))
-  using assms by blast
-*)
-
-text \<open>Express the transformation of @{term push} on the error flag when the operation won't 
-cause the capacity to be exceeded.\<close>
+text \<open>Show that @{term push} preserves the state of the 
+error flag when the operation doesn't cause the capacity to be exceeded.\<close>
 
 lemma push_no_error:
-  assumes "length (buffer q) < capacity q"
+  assumes "length (buffer q) < qsize q"
   shows "error (push q a) = error q"
-  using assms by (cases "(strategy q)"; simp)
+  using assms by (cases "(qohp q)"; simp)
 
-(*
-  apply (simp; rule conjI; clarify)
-   apply (smt (verit, best) Strategy.exhaust Strategy.simps(13) Strategy.simps(14) 
-         Strategy.simps(15) Strategy.simps(16) ext_inject surjective update_convs(2))
-  using assms by blast
-*)
 
 (* 
    Historical note: (from John):  
@@ -292,10 +259,12 @@ Auto Quickcheck found a counterexample:
   v = a\<^sub>1
  *)
 
+text \<open>Prove that @{term push} preserves well-formedness.\<close>
+
 lemma push_wf:
   assumes "wf_Queue q"
   shows "wf_Queue (push q v)"
-using assms by (cases "(strategy q)"; auto simp add: wf_Queue_def)
+using assms by (cases "(qohp q)"; auto simp add: wf_Queue_def)
 
 (*------------------------
    d r o p    properties
@@ -309,13 +278,13 @@ text \<open>@{term drop} frame properties.  The @{term drop} operation doesn't c
 lemma drop_frame_error: "error (drop n q) = error q"
   by simp
 
-lemma drop_frame_capacity: "capacity (drop n q) = capacity q"
+lemma drop_frame_qsize: "qsize (drop n q) = qsize q"
   by simp
 
-lemma drop_frame_strategy: "strategy (drop n q) = strategy q"
+lemma drop_frame_qohp: "qohp (drop n q) = qohp q"
   by simp
 
-text \<open>@{term tail} preserves well-formedness.\<close>
+text \<open>@{term drop} preserves well-formedness.\<close>
 
 lemma drop_wf:
   assumes "wf_Queue q"
@@ -329,15 +298,15 @@ lemma drop_wf:
 text \<open>{\bf clear} Properties\<close>
 
 text \<open>@{term clear} frame properties.  The @{term clear} operation doesn't change the @{term error},
-@{term capacity}, or @{term strategy} fields.\<close>
+@{term qsize}, or @{term qohp} fields.\<close>
 
 lemma clear_frame_error: "error (clear q) = error q"
   by simp
 
-lemma clear_frame_capacity: "capacity (clear q) = capacity q"
+lemma clear_frame_qsize: "qsize (clear q) = qsize q"
   by simp
 
-lemma clear_frame_strategy: "strategy (clear q) = strategy q"
+lemma clear_frame_qohp: "qohp (clear q) = qohp q"
   by simp
 
 text \<open>@{term tail} preserves well-formedness.\<close>
@@ -355,22 +324,22 @@ lemma clear_wf:
 text \<open>{\bf setBuffer} Properties\<close>
 
 text \<open>@{term setBuffer} frame properties.  The @{term setBuffer} operation doesn't change the @{term error},
-@{term capacity}, or @{term strategy} fields.\<close>
+@{term qsize}, or @{term qohp} fields.\<close>
 
 lemma setBuffer_frame_error: "error (setBuffer q b) = error q"
   by simp
 
-lemma setBuffer_frame_capacity: "capacity (setBuffer q b) = capacity q"
+lemma setBuffer_frame_qsize: "qsize (setBuffer q b) = qsize q"
   by simp
 
-lemma setBuffer_frame_strategy: "strategy (setBuffer q b) = strategy q"
+lemma setBuffer_frame_qohp: "qohp (setBuffer q b) = qohp q"
   by simp
 
 text \<open>@{term setBuffer} preserves well-formedness.\<close>
 
 lemma setBuffer_wf:
   assumes "wf_Queue q"
-     and  "length b \<le> capacity q"
+     and  "length b \<le> qsize q"
    shows "wf_Queue (setBuffer q b)"
   using assms by (simp add: wf_Queue_def)
 

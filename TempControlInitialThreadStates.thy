@@ -10,7 +10,7 @@ HAMR AADL-HSM generation defines a empty queue with these attributes.
 The initial state of each thread has port states set to this empty queue.\<close>
 
 definition empty_queue:: "int Queue" where [simp add]:
- "empty_queue = mk_empty_queue 1 DropEarliest"
+ "empty_queue = mk_empty_queue 1 DropOldest"
 
 (*
   Component TempControlSoftwareSystem_s_Instance_tcproc_tempSensor Thread State Attributes

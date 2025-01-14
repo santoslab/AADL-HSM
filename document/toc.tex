@@ -1,0 +1,19 @@
+\documentclass[12pt]{report}
+\usepackage[margin=1.5cm]{geometry}
+%\usepackage{a4wide}
+\makeatletter
+\renewcommand\chapter{\if@openright\cleardoublepage\else\clearpage\fi
+                    \thispagestyle{empty}% original style: plain
+                    \global\@topnum\z@
+                    \@afterindentfalse
+                    \secdef\@chapter\@schapter}
+\makeatother
+\renewcommand{\contentsname}{}
+\begin{document}
+\pagestyle{empty}
+
+\tableofcontents
+
+\addtocontents{toc}{\protect\newpage}
+
+\end{document}

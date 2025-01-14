@@ -1,16 +1,27 @@
-chapter "Representing AADL Model Information"
+(* chapter "Representing AADL Model Information" *)
 
 text \<open>This chapter provides definitions for representing AADL 
 static model information and associated model well-formedness specifications.
 
 The static model structure is designed to represent HAMR-relevant content from a
-AADL system instance model \cite{Feiler?}.   
-Given a system model in the AADL sublanguage processed by HAMR, 
+AADL system instance model \cite[Section 2.2]{Feiler2013}.  The system instance model is 
+a rather complicated structure and an external representation for it has not
+yet been standardized.  When HAMR code generation executes, it generates a 
+JSON instance model representation that also includes model annex information, e.g., 
+including GUMBO contract information.\footnote{The HAMR instance model
+definition is an extension of the XML instance model representation in the 
+Ocarina AADL code generation framework
+(whose development was led by Jerome Hugues).}
+
+Subsequently in the HAMR code generation tool chain, the JSON instance model
+representation is converted into a simplified Slang data structure, which 
+in the HAMR code base is held in the {\tt ArchDescription.scala} file.  It is 
+this data structure that forms the basis of the HAMR Isabelle model representation
+in this theory file.
+
+In summary, given a system model in the AADL sublanguage processed by HAMR, 
 HAMR can generate instances of the types defined in this theory.  This provides the
 basis for proving properties about system's structure and behavior. 
-
-\edcomment{ToDo: Describe the distinction between the instance model and the 
-         information presented here.}
 
 The theory uses Isabelle's Set and Map theories to represent model structures,
 but includes some additional helper functions in the SetsAndMaps theory.\<close>
@@ -29,7 +40,13 @@ text \<open>Port is the main category of feature appearing on the interface of A
 AADL tools typicially will need some concise way of uniquely refering to ports.
 When generating a model representation
 from AADL source, HAMR will generate a unique natural number identifier for each port, which is used throughout the HAMR 
-run-time infrastructure. (ToDo: add remark about new representation using Slang range types.\<close>
+run-time infrastructure. 
+
+\edcomment{ToDo: add remark about new representation using Slang range types.
+That is, Slang range types are used to restrict the ranges of portIds and similar
+ranges. Should the translation generate a constraint corresponding to that range? 
+}
+\<close>
 
 datatype PortId = PortId nat
 
@@ -48,18 +65,15 @@ datatype CompId = CompId nat
 
 type_synonym CompIds = "CompId set"
 
-subsection "Variable Identifiers @{term CompId}"
+subsection "Variable Identifiers @{term VarId}"
 
 text \<open>Variable identifiers are also similar to port identifiers, except that strings are used 
      for readability instead of numbers. \<close>
 
-text \<open>
-\edcomment{ToDo: Rename the following to VarId and VarIds to match 
-the other ID domains.}\<close>
 
-datatype Var = Var string
+datatype VarId = VarId string
 
-type_synonym Vars = "Var set"
+type_synonym VarIds = "VarId set"
 
 section "Ports Descriptors"
 
@@ -71,7 +85,7 @@ of the buffer associated with the port) and other user-specified
 properties of the port that are recognized by HAMR.\<close>
 
 text \<open>@{term PortDirection} indicates the directionality of the port.  
-Note that HAMR only accepts unidirectional ports.  AADL's bi-directional "in out" ports are
+Note that HAMR only accepts unidirectional ports.  AADL's bi-directional {\tt in out} ports are
 disallowed because they complicate analysis, semantics, and code generation.\<close>
 
 datatype PortDirection = 
@@ -85,7 +99,7 @@ distributed memory services where an update to a distributed memory
 cell is automatically propagated to other components that declare
 access to the cell.  \emph{Event data} ports model
 asynchronous messages with payloads, such as in publish-subscribe
-frameworks).  Definitions in XXX cross-reference PortState.thy XXX specify
+frameworks).  Definitions in Section~\ref{sec:port-states} specify
 the state representation for storage associated with ports.  
 Inputs to event and event data ports are buffered. The
 buffer sizes and overflow policies can be configured per port using
@@ -102,11 +116,41 @@ text \<open>The @{term PortDescr} includes the following fields
 \item compId - the unique identifier for the component to which this port belongs,
 \item direction - the direction of the port (in or out)
 \item kind - the AADL port category for the port (event, data, or eventdata),
-\item size - the size of the buffer associated with the port, as declared by the Queue\_Size 
+\item queueSize - the capacity (maximum number of items) of the buffer 
+  associated with the port, as declared by the Queue\_Size 
 port property in the AADL model (see the AADL standard Section 8.3).  When a size is not specified in the AADL model, 
 the size value defaults to 1).  Data ports always have a size of 1.
+\item ohp - corresponds to the AADL standard property {\tt Overflow\_Handling\_Protocol}
+ (see the AADL standard Section 8.3).  This policy choice determines the behavior of an
+enqueue operation when the port queue is full.
 \end{itemize}
 \<close>
+
+text \<open>Define an enumerated type to represent the possible values of the 
+AADL {\tt Overflow\_Handling\_Protocol} (see the AADL standard Section 8.3.3 (35))
+indicating the behavior of an enqueue operation when the port queue is full.\<close>
+
+datatype OverflowHandlingProtocol = DropNewest | DropOldest | Error | Unbounded
+
+text \<open>
+\begin{itemize}
+\item {\tt DropNewest} - the newly arriving item is dropped (not enqueued).
+\item {\tt DropOldest} - the oldest item in the queue is dequeued and the newly arriving
+item is enqueued.
+\item {\tt Error} - This option can be declared in the semantics currently, but it is 
+not fully specified because the AADL standard underspecifies the intended semantics.
+The AADL standard states that a thread error state results and a 
+thread may  determine the port that caused the error by consulting the thread state 
+Dispatch Status value (Section 8.3.3 (35)).  Section A.4 also adds ``the
+thread’s error recovery to be invoked''.
+\item {\tt Unbounded} -- not a valid AADL standard concept, but allowed to support 
+prototyping in HAMR and this formalization.
+\end{itemize}
+The default setting (enforced by the HAMR translation into Isabelle) is {\tt DropOldest}.
+This is relevant for data ports because it achieves the desired data port semantics of 
+overwriting the currently held value.
+\<close>
+
 
 record PortDescr =
   name :: "string" 
@@ -114,10 +158,11 @@ record PortDescr =
   compId :: "CompId" 
   direction :: PortDirection
   kind :: PortKind
-  size :: "nat"    (* ToDo (from John): Assess if we should do a better job reconciling this field name with AADL property Max_Queue_Size *)
-  urgency :: "nat"  (* ToDo (from John): Assess if we should do a better job reconciling this field name with AADL property Max_Queue_Size *)
-  (* ToDo (from John): Add port overflow stategy and connect this field with the strategy in Queue *)
-
+  queueSize :: "nat"  \<comment> \<open>Corresponds to standard AADL property {\tt Queue\_Size}.\<close>
+  urgency :: "nat"  \<comment> \<open>Corresponds to standard AADL property {\tt Urgency}.\<close>
+  ohp :: OverflowHandlingProtocol  \<comment> \<open>Corresponds to standard AADL property 
+                                         {\tt Overflow\_Handling\_Protocol}.\<close>
+  
 subsection \<open>Port Descriptor Well-formedness\<close>
 
 text \<open>A port descriptor is well-formed iff
@@ -126,19 +171,25 @@ text \<open>A port descriptor is well-formed iff
 \item if the port is a data port, then its queue size must be equal to 1 (as specified 
 in the AADL standard Section 8.3 (3)).
 \end{itemize}
+
+\edcomment{The AADL standard has a global properties {\tt Max\_Queue\_Size} {\tt Max\_Urgency} to bound all
+port-specific {\tt Queue\_Size} and {\tt Urgency} values.  
+We do not need that in the semantics now, but it could be added and enforced in 
+well-formedness checks.}
 \<close>
 
+
 definition wf_PortDescr :: "PortDescr \<Rightarrow> bool"
-  where "wf_PortDescr pd \<equiv> (PortDescr.size pd > 0) 
-                         \<and> (PortDescr.kind pd = Data \<longrightarrow> PortDescr.size pd = 1)"
+  where "wf_PortDescr pd \<equiv> (PortDescr.queueSize pd > 0) 
+                         \<and> (PortDescr.kind pd = Data \<longrightarrow> PortDescr.queueSize pd = 1)"
 
 subsection \<open>Helper Functions for Working with Ports and Port Descriptors\<close>
 
 text \<open>The following function can be used to abbreviate the declaration of 
 port descriptors.\<close>
 
-fun mkPortDescr where "mkPortDescr n i ci d k s u 
-      = \<lparr> name= n, id=i, compId= ci, direction=d, kind= k, size= s, urgency= u \<rparr>"
+fun mkPortDescr where "mkPortDescr n i ci d k s u op
+      = \<lparr> name= n, id=i, compId= ci, direction=d, kind= k, queueSize= s, urgency= u, ohp= op\<rparr>"
 
 text \<open>The following helper functions query properties of ports as captured in port descriptors.\<close>
 
@@ -192,7 +243,7 @@ Periodic threads are dispatched at regular intervals as defined by the
 AADL Period property (time and associated timing properties are not represented
 currently).   Sporadic threads are dispatched up the arrival of messages
 on event-like ports.  The specific conditions for thread dispatching are formalized
-in DispatchLogic.thy XXXX cross reference XXXX.
+in Chapter~\ref{chap:dispatch-logic}. 
 HAMR currently does not support the remaining AADL dispatch protocols (Aperiodic, 
 Timed, Hybrid).\<close>
 
@@ -207,7 +258,7 @@ text \<open>The @{term CompDescr} includes the following fields
       of the component,  for the component to which this port belongs,
 \item dispatchProtocol - the value of the AADL property Dispatch\_Protocol for this (thread) component,
 \item dispatchTriggers - the set of identifiers for event-like input ports that can act as dispatch
-triggers for this thread (for a longer discussion, see XXXX DispatchLogic.thy XXX),
+triggers for this thread (for a longer discussion, see Chapter~\ref{chap:dispatch-logic}),
 \item compVars - the set of identifiers for variables that contribute to the behavior
 of the component, as specified by GUMBO contract declarations.
 \end{itemize}
@@ -219,7 +270,7 @@ record CompDescr =
   portIds :: "PortIds" (* ports belonging to this component *)
   dispatchProtocol :: "DispatchProtocol"  
   dispatchTriggers :: "PortIds" (* ids of ports that can trigger a dispatch *)
-  compVars :: "Vars"
+  varIds :: "VarIds"
 
 subsection \<open>Helper Functions for Working with Components and Component Descriptors\<close>
 
@@ -227,7 +278,7 @@ text \<open>The following function can be used to abbreviate the declaration of
 component descriptors.\<close>
 
 fun mkCompDescr where "mkCompDescr n i pis dp dts v = 
-  \<lparr> name= n,  id=i, portIds= pis, dispatchProtocol= dp, dispatchTriggers= dts, compVars= v \<rparr>"
+  \<lparr> name= n,  id=i, portIds= pis, dispatchProtocol= dp, dispatchTriggers= dts, varIds= v \<rparr>"
 
 text \<open>The following helper functions query properties of components as captured in 
       component descriptors.\<close>
@@ -266,10 +317,6 @@ record Model =
   modelConns :: "Conns"
  
 text \<open>A helper function for abbreviating the construction of model structures.\<close>
-
-text \<open>\edcomment{I'm pretty sure I saw a built-in notation for this in the 
-      Isabelle tutorial (i.e., check to see if we can use the built in
-      notation and avoid making our own everywhere.}\<close>
 
 fun mkModel where "mkModel compdescrs portdescrs conns = 
   \<lparr> modelCompDescrs= compdescrs,  modelPortDescrs= portdescrs,  
@@ -316,12 +363,12 @@ fun isOutPID :: "Model \<Rightarrow> PortId \<Rightarrow> bool"
   where "isOutPID m p = (direction (modelPortDescrs m $ p) = Out)"
 
 text \<open>Does model m include a port (id) p with queue capacity n?\<close>
-fun isSizePID :: "Model \<Rightarrow> PortId \<Rightarrow> nat \<Rightarrow> bool"
-  where "isSizePID m p n = (size (modelPortDescrs m $ p) = n)"
+fun isQueueSizePID :: "Model \<Rightarrow> PortId \<Rightarrow> nat \<Rightarrow> bool"
+  where "isQueueSizePID m p n = (queueSize (modelPortDescrs m $ p) = n)"
 
 text \<open>Return the queue capacity of port (id) p in model m.\<close>
-fun sizePID :: "Model \<Rightarrow> PortId \<Rightarrow> nat"
-  where "sizePID m p = (size (modelPortDescrs m $ p))"
+fun queueSizePID :: "Model \<Rightarrow> PortId \<Rightarrow> nat"
+  where "queueSizePID m p = (queueSize (modelPortDescrs m $ p))"
 
 text \<open>Return the kind (data, event, event data) of port (id) p in model m.\<close>
 fun kindPID :: "Model \<Rightarrow> PortId \<Rightarrow> PortKind"
@@ -347,7 +394,9 @@ text \<open>Return the urgency of port (id) p in model m.\<close>
 fun urgencyPID :: "Model \<Rightarrow> PortId \<Rightarrow> nat"
   where "urgencyPID m p = (urgency (modelPortDescrs m $ p))"
 
-
+text \<open>Is source port (id) p1 connected to target port (id) p2?\<close>
+fun connectedPIDs :: "Model \<Rightarrow> PortId \<Rightarrow> PortId \<Rightarrow> bool"
+  where "connectedPIDs m p1 p2 = (p2 \<in> ((modelConns m) $ p1))"
 
 subsection \<open>Queries About Ports Associated With a Specific Component\<close>
 
@@ -362,11 +411,11 @@ fun isPortOfCIDPID :: "Model \<Rightarrow> CompId \<Rightarrow> PortId \<Rightar
   where "isPortOfCIDPID  m c p = (p \<in> (portIds ((modelCompDescrs m) $ c)))"
 
 text \<open>In model m, does component (descriptor) cd have a var (id) v?\<close>
-fun isVarOfCD :: "Model \<Rightarrow> CompDescr \<Rightarrow> Var \<Rightarrow> bool"
-  where "isVarOfCD m cd v = (v \<in> (compVars cd))"
+fun isVarOfCD :: "Model \<Rightarrow> CompDescr \<Rightarrow> VarId \<Rightarrow> bool"
+  where "isVarOfCD m cd v = (v \<in> (varIds cd))"
 
 text \<open>In model m, does component (id) c have a var (id) v?\<close>
-fun isVarOfCID :: "Model \<Rightarrow> CompId \<Rightarrow> Var \<Rightarrow> bool"
+fun isVarOfCID :: "Model \<Rightarrow> CompId \<Rightarrow> VarId \<Rightarrow> bool"
   where "isVarOfCID m c v = isVarOfCD m ((modelCompDescrs m) $ c) v"
 
 text \<open>In model m, does component (descriptor) cd have an input port (id) p?\<close>
@@ -447,6 +496,10 @@ text \<open>Return the input event-like ports belonging to component (id) c in m
 fun inEventLikePortsOfCID :: "Model \<Rightarrow> CompId \<Rightarrow> PortId set"
   where "inEventLikePortsOfCID m c = {p . isInEventLikeCIDPID m c p}"
 
+text \<open>Return the output ports belonging to component (id) c in model m.\<close>
+fun outPortsOfCID :: "Model \<Rightarrow> CompId \<Rightarrow> PortId set"
+  where "outPortsOfCID m c = {p . isOutCIDPID m c p}"
+
 text \<open>Return the dispatch triggers (port ids)belonging to component (id) c in model m.\<close>
 fun dispatchTriggersOfCID :: "Model \<Rightarrow> CompId \<Rightarrow> PortId set" 
   where "dispatchTriggersOfCID  m c = dispatchTriggers ((modelCompDescrs m) $ c)"
@@ -467,12 +520,15 @@ of these properties are automatically proven.
 
 (*
  To Add
-   * no data port fan in (Abdullah is working on this)
    * no reuse of var ids across components (may not need to this -- does Stefan need it?)
-   * We currently have dispatchTriggers is non-empty, but we should also constrain
-     further to say that only EventLike input ports can be dispatch triggers. 
    * add constraints on Urgency ?
 *)
+
+text \<open>The model is finite, i.e., the sets of descriptors are finite.\<close> 
+definition wf_Model_Finite :: "Model \<Rightarrow> bool" 
+  where "wf_Model_Finite m \<equiv> 
+    finite (dom (modelCompDescrs m)) \<and> 
+    finite (dom (modelPortDescrs m))"
 
 text \<open>Each port descriptor in the modelPortDescrs map is well-formed.\<close> 
 definition wf_Model_PortDescr :: "Model \<Rightarrow> bool" 
@@ -494,6 +550,9 @@ definition wf_Model_CompDescrsIds :: "Model \<Rightarrow> bool"
 text \<open>For each entry (p:: PortId, pd:: PortDescr) in the port descriptors map, 
    the comp id indicating the enclosing component for the port is in the
    domain of the component descriptors map.\<close>
+
+(* ToDo: it may be best to use the "inModel" predicate here as an abstraction 
+   for dom (..) *)
 definition wf_Model_PortDescrsCompId :: "Model \<Rightarrow> bool" 
   where "wf_Model_PortDescrsCompId m \<equiv> 
   (\<forall>p \<in> dom (modelPortDescrs m). PortDescr.compId ((modelPortDescrs m) $ p) \<in> dom (modelCompDescrs m))"
@@ -528,14 +587,31 @@ definition wf_Model_ConnsPortCategories :: "Model \<Rightarrow> bool"
   where "wf_Model_ConnsPortCategories m \<equiv> 
   (\<forall>p \<in> dom (modelConns m).(isOutPID m p) \<and> 
    (\<forall>p'\<in> ((modelConns m) $ p).(isInPID m p') \<and> (kindPID m p = kindPID m p')))"
-                          
-text \<open>For each entry (p:: PortId, pd:: PortDescr) in the port map,  
-      if p is an in data port, then it has a size of at most one.\<close>
-definition wf_Model_InDataPorts :: "Model \<Rightarrow> bool"
-  where "wf_Model_InDataPorts m \<equiv>
-  (\<forall>p \<in> dom (modelPortDescrs m). 
-      (isInPID m p) \<and> (isDataPD (modelPortDescrs m $ p)) 
-          \<longrightarrow> (sizePID m p) \<le> 1)" (* ToDo: seems like this is redundant with wf_PortDescr *)
+
+text \<open>No ``fan in'' for data ports:  for each p1, p2 that are connection sources 
+      in the connections map,  if p1 and p2 both connect to a target port q and q is a data port, 
+      then p1 and p2 must be identical (see AADL standard Section 9.1 (L11)), and also
+      Section 9.2.2 (20) -- ``Data ports are restricted to 1-n connectivity, i.e., a data port 
+      can have multiple outgoing connections, but only one incoming connection per mode. 
+      Since data ports hold a single data state value, multiple incoming connections
+      would result in multiple sources overwriting each other’s values in the destination 
+      port variable.''\<close>
+
+definition wf_Model_ConnsNoDataPortFanIn :: "Model \<Rightarrow> bool" 
+  where "wf_Model_ConnsNoDataPortFanIn m \<equiv> 
+  (\<forall>p1 \<in> dom (modelConns m).\<forall>p2 \<in> dom (modelConns m).
+   \<forall>q. connectedPIDs m p1 q \<and> connectedPIDs m p2 q \<and> isDataPID m q
+    \<longrightarrow> p1 = p2)"
+
+
+text \<open>For each entry (c:: CompId, cd:: CompDescr) in the component descriptors map, 
+   the port ids of the declared dispatch triggers must be input event-like ports belonging to 
+   the components.\<close>
+
+definition wf_Model_CompDescrsDispatchTriggers :: "Model \<Rightarrow> bool"
+  where "wf_Model_CompDescrsDispatchTriggers m \<equiv> 
+  (\<forall>c \<in> dom (modelCompDescrs m).  
+    (dispatchTriggersOfCID m c \<subseteq> inEventLikePortsOfCID m c))"
 
 text \<open>For each entry (c:: CompId, cd:: CompDescr) in the component descriptors map, 
 if c is Sporadic, then cd's dispatchTriggers is non-empty.
@@ -543,12 +619,12 @@ HAMR currently ignores dispatch trigger declarations in periodic ports.
 NOTE: the AADL standard does not require that dispatch triggers are declared in
 Sporadic threads.  The standard specifies that, in the absence of dispatch
 trigger declarations in Sporadic threads, ALL event-like ports are treated
-as dispatch triggers by default.  We do not include the logic for "by default".
+as dispatch triggers by default.  We do not include the logic for ``by default''.
 Instead, we assume that the HAMR Isabelle model generation strategy will
 look for any dispatch trigger declarations for the thread in the AADL model,
 and if no such declarations exist, the translation will 
 explicitly insert in dispatchTriggers field in the CompDescr, a set containing
-the set of event-like input ports for the thread.  This simplifies the logic
+the set of all event-like input ports for the thread.  This simplifies the logic
 in the Isabelle model and HAMR code-base.
 \<close>
 
@@ -557,13 +633,15 @@ definition wf_Model_SporadicComp :: "Model \<Rightarrow> bool"
   (\<forall>c \<in> dom (modelCompDescrs m). (isSporadicCD (modelCompDescrs m $ c)) 
     \<longrightarrow> (dispatchTriggers (modelCompDescrs m $ c)) \<noteq> empty)"
 
-(* Should the following be added - no dispatch triggers are declared in periodic threads?
+
+text \<open>For each entry (c:: CompId, cd:: CompDescr) in the component descriptors map, 
+if c is Periodic, then cd's dispatchTriggers is empty.\<close>
 
 definition wf_Model_PeriodicComp :: "Model \<Rightarrow> bool"
   where "wf_Model_PeriodicComp m \<equiv>
   (\<forall>c \<in> dom (modelCompDescrs m). (isPeriodicCD (modelCompDescrs m $ c)) 
     \<longrightarrow> (dispatchTriggers (modelCompDescrs m $ c)) = empty)"
-*)
+
 
 text \<open>
 The following top-level definition for well-formed models
@@ -571,7 +649,8 @@ is the conjunction of the properties above.\<close>
 
 definition wf_Model :: "Model \<Rightarrow> bool"
   where "wf_Model m \<equiv>
-           wf_Model_PortDescr m
+           wf_Model_Finite m
+         \<and> wf_Model_PortDescr m
          \<and> wf_Model_PortDescrsIds m
          \<and> wf_Model_CompDescrsIds m
          \<and> wf_Model_PortDescrsCompId m
@@ -579,8 +658,10 @@ definition wf_Model :: "Model \<Rightarrow> bool"
          \<and> wf_Model_DisjointPortIds m
          \<and> wf_Model_ConnsPortIds m
          \<and> wf_Model_ConnsPortCategories m
-         \<and> wf_Model_InDataPorts m
-         \<and> wf_Model_SporadicComp m"
+         \<and> wf_Model_ConnsNoDataPortFanIn m 
+         \<and> wf_Model_CompDescrsDispatchTriggers m
+         \<and> wf_Model_SporadicComp m
+         \<and> wf_Model_PeriodicComp m"
 
 text \<open>
 Finiteness of models is implied by other wf conditions, e.g. @{term wf_SystemSchedule}, but
@@ -593,11 +674,14 @@ definition finite_Model :: "Model \<Rightarrow> bool"
 
 section \<open>Properties Derived from Well-formedness\<close>
 
+text \<open>The following helper lemmas lift constraints on queue capacity 
+specified in the lower-level port descriptors to the top-level model abstractions.\<close>
+
 lemma wf_model_implies_data_ports_capacity: 
   assumes wf_m: "wf_Model m"
       and p_in_m: "p \<in> dom (modelPortDescrs m)"
       and p_is_dataport: "isDataPID m p"
-    shows "(sizePID m p) = 1"
+    shows "(queueSizePID m p) = 1"
 proof - 
   from p_is_dataport have h1: "(kind (modelPortDescrs m $ p)) = Data" by auto 
   from wf_m have h2: "wf_Model_PortDescr m" unfolding wf_Model_def by auto
@@ -609,7 +693,7 @@ lemma
   assumes wf_m: "wf_Model m"
       and p_in_m: "p \<in> dom (modelPortDescrs m)"
       and p_is_dataport: "isDataPID m p"
-    shows "(sizePID m p) = 1"
+    shows "(queueSizePID m p) = 1"
 proof - 
   from p_is_dataport have h1: "(kind (modelPortDescrs m $ p)) = Data" by auto 
   from wf_m have h3: "wf_PortDescr ((modelPortDescrs m) $ p)" 
@@ -617,10 +701,45 @@ proof -
   from h3 h1 show ?thesis by (simp add: wf_PortDescr_def)
 qed
 
+(*
 lemma  
  "\<lbrakk>wf_Model m; isDataPID m p\<rbrakk> \<Longrightarrow> p \<in> dom (modelPortDescrs m)"
-  apply (auto simp add: wf_Model_def wf_Model_PortDescr_def wf_PortDescr_def)   
+  apply (simp only: wf_Model_def wf_Model_PortDescr_def wf_PortDescr_def) 
+  sledgehammer
   sorry
+*)
 
+lemma wf_model_implies_port_capacity_ge_one: 
+  assumes wf_m: "wf_Model m"
+      and p_in_m: "inModelPID m p"
+    shows "1 \<le> (queueSizePID m p)"
+proof -
+  \<comment> \<open>Unfold well-formedness properties.\<close>
+  from wf_m have h1: "wf_Model_PortDescr m" unfolding wf_Model_def by auto
+  from h1 have h2: "wf_PortDescr ((modelPortDescrs m) $ p)" using wf_Model_PortDescr_def p_in_m by simp
+   \<comment> \<open>The definition of well-formedness for port descriptors includes the condition that
+      the maximum queue capacity is greater than 0.\<close>
+  from h2 have h3: "0 < queueSize ((modelPortDescrs m) $ p)" by (simp add: wf_PortDescr_def)
+  \<comment> \<open>..and from this we can show that the capacity is greater than or equal to 1.\<close>
+  from h3 show ?thesis by auto
+qed
+
+
+lemma isInCIDPID_implies_p_in_m:
+  assumes wf_m:  "wf_Model m"
+      and p_assm: "isInCIDPID m t p"
+      and t_in_m: "t \<in> modelCIDs m" (* can this be derived from the property above? *)
+    shows "inModelPID m p"
+proof - 
+  from assms show ?thesis 
+    using wf_Model_def wf_Model_CompDescrsContainedPortIds_def 
+    by auto
+(*
+  from p_assm have h1: "p \<in> (portIds ((modelCompDescrs m) $ t))" by simp
+  from wf_m have h3: "CompDescr.portIds ((modelCompDescrs m) $ t) \<subseteq> dom (modelPortDescrs m)"
+    using wf_Model_def wf_Model_CompDescrsContainedPortIds_def t_in_m by simp
+  from h1 h3 show ?thesis by auto
+*)
+qed
 
 end

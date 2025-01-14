@@ -22,7 +22,8 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_currentTemp wh
      Out  \<comment> \<open>Port direction.\<close>
      Data \<comment> \<open>Port kind.\<close>
      1 \<comment> \<open>Maximum number of values in port buffer.\<close>
-     0" \<comment> \<open>Urgency (priority).\<close>
+     0 \<comment> \<open>Urgency (priority).\<close>
+     DropOldest"
 
 text \<open>Add this definition to the list of definitions that will be automatically
 unfolded by the Isabelle simplifier.  This is primarily used to automatically prove 
@@ -41,7 +42,9 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_tempChanged wh
      Out  \<comment> \<open>Port direction.\<close>
      Event  \<comment> \<open>Port kind.\<close>
      1 \<comment> \<open>Maximum number of values in port buffer.\<close>
-     0" \<comment> \<open>Urgency (priority).\<close>
+     0 \<comment> \<open>Urgency (priority).\<close>
+     DropOldest" 
+
 declare TempControlSoftwareSystem_s_Instance_tcproc_tempSensor_tempChanged_def [simp add]
 
 text \<open>Now, we have the @{term CompDescr} definition for the {\tt TempSensor} component.\<close>
@@ -74,7 +77,9 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_fan_fanCmd where
      In
      Event
      1
-     0"
+     0
+     DropOldest"
+
 declare TempControlSoftwareSystem_s_Instance_tcproc_fan_fanCmd_def [simp add]
 
 
@@ -88,7 +93,9 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_fan_fanAck where
      Out
      Event
      1
-     0"
+     0
+     DropOldest"
+
 declare TempControlSoftwareSystem_s_Instance_tcproc_fan_fanAck_def [simp add]
 
 
@@ -120,7 +127,8 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_tempControl_currentTemp w
      In
      Data
      1
-     0"
+     0
+     DropOldest"
 declare TempControlSoftwareSystem_s_Instance_tcproc_tempControl_currentTemp_def [simp add]
 
 
@@ -134,7 +142,8 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_tempControl_fanAck where
      In
      Event
      1
-     0"
+     0
+     DropOldest"
 declare TempControlSoftwareSystem_s_Instance_tcproc_tempControl_fanAck_def [simp add]
 
 
@@ -148,7 +157,9 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_tempControl_setPoint wher
      In
      Event
      1
-     0"
+     0
+     DropOldest"
+
 declare TempControlSoftwareSystem_s_Instance_tcproc_tempControl_setPoint_def [simp add]
 
 
@@ -162,7 +173,9 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_tempControl_tempChanged w
      In
      Event
      1
-     0"
+     0
+     DropOldest"
+
 declare TempControlSoftwareSystem_s_Instance_tcproc_tempControl_tempChanged_def [simp add]
 
 
@@ -176,7 +189,9 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_tempControl_fanCmd where
      Out
      Event
      1
-     0"
+     0
+     DropOldest"
+
 declare TempControlSoftwareSystem_s_Instance_tcproc_tempControl_fanCmd_def [simp add]
 
 
@@ -208,7 +223,9 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_current
      In
      Data
      1
-     0"
+     0
+     DropOldest"
+
 declare TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_currentTemp_def [simp add]
 
 
@@ -222,7 +239,9 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_tempCha
      In
      Event
      1
-     0"
+     0
+     DropOldest"
+
 declare TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_tempChanged_def [simp add]
 
 
@@ -236,7 +255,9 @@ definition TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_setPoin
      Out
      Event
      1
-     0"
+     0
+     DropOldest"
+
 declare TempControlSoftwareSystem_s_Instance_tcproc_operatorInterface_setPoint_def [simp add]
 
 
@@ -344,10 +365,16 @@ lemma sysModel_wf_Model_DisjointPortIds: "wf_Model_DisjointPortIds sysModel"
 lemma sysModel_wf_Model_ConnsPortCategories: "wf_Model_ConnsPortCategories sysModel"
   by (simp add: wf_Model_ConnsPortCategories_def)
 
-lemma sysModel_wf_Model_InDataPorts: "wf_Model_InDataPorts sysModel"
-  by (simp add: wf_Model_InDataPorts_def)
+lemma sysModel_wf_Model_ConnsNoDataPortFanIn: "wf_Model_ConnsNoDataPortFanIn sysModel"
+  by (simp add: wf_Model_ConnsNoDataPortFanIn_def; force)
+
+lemma sysModel_wf_Model_CompDescrsDispatchTriggers: "wf_Model_CompDescrsDispatchTriggers sysModel"
+  by (simp add: wf_Model_CompDescrsDispatchTriggers_def)
 
 lemma sysModel_wf_Model_SporadicComp: "wf_Model_SporadicComp sysModel"
   by (simp add: wf_Model_SporadicComp_def)
+
+lemma sysModel_wf_Model_PeriodicComp: "wf_Model_PeriodicComp sysModel"
+  by (simp add: wf_Model_PeriodicComp_def)
 
 end

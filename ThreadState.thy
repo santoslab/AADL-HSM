@@ -40,7 +40,7 @@ begin
 
 subsection \<open>Structures\<close>
 
-text \<open>The AADL standard presents "dispatch status" as information
+text \<open>The AADL standard presents ``dispatch status'' as information
 that the thread application code can access to find out what triggered the dispatch of the thread
 (in particular, for sporadic dispatch protocol, which input event-like port had an event arrival
 that triggered the dispatch). However, the standard does not fully specify the concept.  
@@ -52,11 +52,11 @@ datatype DispatchStatus =
   | Periodic "PortIds" (* Periodic Thread is enabled with a set of input ports to be frozen *)
   | Sporadic "PortId * PortIds" (* Sporadic Thread is enabled by dispatch trigger Port  with a set of input ports to be frozen *)
 
-text \<open>The "Periodic" alternate of the datatype indicates that the thread is currently
+text \<open>The @{text Periodic} alternate of the datatype indicates that the thread is currently
 executing due to a periodic dispatch and the accompanying @{term PortIds} indicates
 the set of input ports that have had their values frozen (by the invocation of the
 ReceiveInput RTS). 
-The "Sporadic" alternate of the datatype indicates that the thread is currently
+The @{text Sporadic} alternate of the datatype indicates that the thread is currently
 executing due to a sporadic dispatch that has been triggered
 by the arrival of a message on the port indicated by @{term PortId} 
 and the accompanying @{term PortIds} indicates
@@ -67,19 +67,26 @@ an access could result in a race condition).  The condition that the thread
 (and, in HAMR, an accompanying GUMBO contract) must not access an unfrozen
 port should be enforced by static checks on the program code and contract specification.
 For more information about how this semantics interprets the standard's 
-approach to "freezing input ports", see DispatchLogic.thy.
+approach to "freezing input ports", see DispatchLogic.thy (Section~\ref{sec:dispatch-logic}).
 
-The "NotEnabled" alternate is more a technical choice of the semantics design.
+The @{text NotEnabled} alternate is more a technical choice of the semantics design.
 The thread application code would never see this alternate since if the thread
 is not enabled, the application code would not be running.  We have added
 this alternative to give the runtime system a value that the dispatch status field
-of the thread state can be set to when the thread is not executing. Another alterative
+of the thread state can be set to when the thread is not executing. Other alteratives
 might be to have the status field set to the most recent dispatch status value or
-some other default value.\<close>
+some other default value, or to use an option type (with NONE corresponding to @{text NotEnabled}).\<close>
 
 text \<open>Given a dispatch status value, the following helper function returns the set of 
 input ports whose values are frozen.  These form the conceptual "port inputs" to the 
 application logic during that particular dispatch of the thread.\<close>
+
+(* ToDo: John: refactor or rename these two helper functions.  For example, it
+should be the case for Sporadic that is p triggers a dispatch then p is also frozen.
+We may not need both of these functions. *)
+
+(* ToDo: The following is buggy - the triggering sporadic port should also be returned.
+   Search to find all uses of the definition below. *)
 
 fun dispatchInputPorts :: "DispatchStatus \<Rightarrow> PortIds" where
   "dispatchInputPorts NotEnabled = {}"
@@ -96,13 +103,10 @@ fun disp_elem:: "DispatchStatus \<Rightarrow> PortId \<Rightarrow> bool" where
                      | Periodic portset \<Rightarrow> p \<in> portset  
                      | Sporadic (p',portset) \<Rightarrow> ((p = p') \<or> p \<in> portset))" 
 
-(* ToDo: John: refactor or rename these two helper functions.  For example, it
-should be the case for Sporadic that is p triggers a dispatch then p is also frozen.
-We may not need both of these functions. *)
 
 text \<open>The runtime state of the thread consists of the following elements.  For further motivation
-and rationale, see Hatcliff-al:ISOLA22. The justification for the @{term PortState} fields 
-of the @{term ThreadState} is also summarized in PortState.thy.
+and rationale, see \cite{Hatcliff-al:ISOLA2022}. The justification for the @{term PortState} fields 
+of the @{term ThreadState} is also summarized in PortState.thy (Section~\ref{sec:port-states}).
 
 \begin{itemize}
 \item @{term tvar} - the state of the thread's local variables 
@@ -142,9 +146,6 @@ text \<open>In general, thread state well-formedness definitions
 (*
   Note: eventually, we would also need
    - type compatibility for values associated with ports
-   - conformance of queue sizes to declared queue size properties
-      (for now, we can simplify by just hardwiring the well-formedness predicate
-       to a maximum queue size of 1)
 *)
 
 subsubsection \<open>Well-formed Thread State Elements\<close>
@@ -154,28 +155,71 @@ definition wf_ThreadState_tvar:: "Model \<Rightarrow> CompId \<Rightarrow> ('a V
 
 text \<open>The infi component of a ThreadState (input infrastructure port map) 
    is well formed when the domain of the infi port map is equal to the set of 
-   input ports for the thread declared in the model. 
+   input ports for the thread declared in the model.
    Intuitively, each of the declared "in" ports for the thread (according to the model)
    is associated with a infrastructure message queue, 
-   (and there are no "extra" ports in the map). \<close>
-
-(* ToDo: add constraint to port size and policy -- probably need to pass the port
-   descriptor down to port well-formedness *)
+   (and there are no "extra" ports in the map).
+   Furthermore, the PortState structure elements must also be 
+   well-formed, i.e., the associated queues are aligned with model attributes
+   for the port indicating the capacity and overflow policy for the port. 
+   \<close>
 
 definition wf_ThreadState_infi:: "Model \<Rightarrow> CompId \<Rightarrow> ('a PortState) \<Rightarrow> bool" where
- "wf_ThreadState_infi m c ps \<equiv> wf_PortState m {p . isInCIDPID m c p} ps" 
+(*
+ "wf_ThreadState_infi m c ps \<equiv> wf_PortState m {p . isInCIDPID m c p} ps" *)
+ "wf_ThreadState_infi m c ps \<equiv> wf_PortState m (inPortsOfCID m c) ps"
 
 text \<open>The definitions below for other port-state elements are similar.\<close>
 
 definition wf_ThreadState_appi:: "Model \<Rightarrow> CompId \<Rightarrow> ('a PortState) \<Rightarrow> bool" where
- "wf_ThreadState_appi m c ps \<equiv> wf_PortState m {p . isInCIDPID m c p} ps"
+ "wf_ThreadState_appi m c ps \<equiv> wf_PortState m (inPortsOfCID m c) ps"
 
+lemma wf_clearAll_appi:
+  assumes "wf_ThreadState_appi m c ps"
+  shows "wf_ThreadState_appi m c (clearAll (dom ps) ps)"
+proof -
+  have h1: "wf_PortState_dom m (inPortsOfCID m c) ps"
+   and h2: "wf_PortState_queues m (inPortsOfCID m c) ps"
+  using assms unfolding wf_ThreadState_appi_def wf_PortState_def apply blast 
+  using assms wf_PortState_def wf_ThreadState_appi_def by blast
+  have h3: "wf_PortState_dom m (inPortsOfCID m c) (clearAll (dom ps) ps)"
+    using h1 unfolding wf_PortState_dom_def dom_def map_get_def mem_Collect_eq
+    apply (simp only: clearAll.simps inPortsOfCID.simps modelPIDs.simps)
+    apply clarify
+    by fastforce
+  have h4: "wf_PortState_queues m (inPortsOfCID m c) (clearAll (dom ps) ps)"
+    using h2 clear_wf unfolding wf_PortState_queues_def wf_PortState_queue_def by fastforce
+  show ?thesis 
+    using h3 h4 unfolding wf_PortState_def wf_ThreadState_appi_def by blast
+qed
 
 definition wf_ThreadState_appo:: "Model \<Rightarrow> CompId \<Rightarrow> ('a PortState) \<Rightarrow> bool" where
- "wf_ThreadState_appo m c ps \<equiv> wf_PortState m {p . isOutCIDPID m c p} ps"
+ "wf_ThreadState_appo m c ps \<equiv> wf_PortState m (outPortsOfCID m c) ps"
+
+lemma wf_clearAll_appo:
+  assumes "wf_ThreadState_appo m c ps"
+  shows "wf_ThreadState_appo m c (clearAll (dom ps) ps)"
+proof -
+  have h1: "wf_PortState_dom m (outPortsOfCID m c) ps"
+   and h2: "wf_PortState_queues m (outPortsOfCID m c) ps"
+  using assms unfolding wf_ThreadState_appo_def wf_PortState_def apply blast 
+  using assms wf_PortState_def wf_ThreadState_appo_def by blast
+  have h3: "wf_PortState_dom m (outPortsOfCID m c) (clearAll (dom ps) ps)"
+    using h1 unfolding wf_PortState_dom_def dom_def map_get_def mem_Collect_eq
+    apply (simp only: clearAll.simps inPortsOfCID.simps modelPIDs.simps)
+    apply clarify
+    by fastforce
+  have h4: "wf_PortState_queues m (outPortsOfCID m c) (clearAll (dom ps) ps)"
+    using h2 clear_wf unfolding wf_PortState_queues_def wf_PortState_queue_def by fastforce
+  show ?thesis 
+    using h3 h4 unfolding wf_PortState_def wf_ThreadState_appo_def by blast
+qed
 
 definition wf_ThreadState_info:: "Model \<Rightarrow> CompId \<Rightarrow> ('a PortState) \<Rightarrow> bool" where
  "wf_ThreadState_info m c ps \<equiv> wf_PortState m {p . isOutCIDPID m c p} ps"
+
+lemma appo_wf_info: "wf_ThreadState_appo m c ps \<Longrightarrow> wf_ThreadState_info m c ps"
+  by (metis outPortsOfCID.simps wf_ThreadState_appo_def wf_ThreadState_info_def)
 
 text \<open>If p is mentioned in the dispatch status of ts, then it must be an input port of c.
       ToDo: constrain to dispatch triggers, also check the relationship between 
@@ -183,6 +227,9 @@ text \<open>If p is mentioned in the dispatch status of ts, then it must be an i
 
 definition wf_ThreadState_disp:: "Model \<Rightarrow> CompId \<Rightarrow> DispatchStatus \<Rightarrow> bool" where
  "wf_ThreadState_disp m c ds \<equiv> (\<forall>p. disp_elem ds p \<longrightarrow> isInCIDPID m c p)" 
+
+lemma wf_ThreadState_disp_NotEnabled: "wf_ThreadState_disp m c NotEnabled"
+  by (simp add: wf_ThreadState_disp_def)
 
 subsubsection \<open>Well-formed Thread States\<close>
 
@@ -231,12 +278,12 @@ and port value maps match the model declarations.
 text \<open>Currently, we instantiate the universal data type to @{type int} and
 use @{term 0} for the default variable value.\<close>
 
-definition default_value:: "int" where "default_value \<equiv> 0"
+definition default_value:: "'a" where "default_value \<equiv> undefined"
 
 text \<open>The @{term tvar} component of an initial state is well-formed
 wrt the model, and the value of each variable is the default value.\<close>
 
-definition initial_ThreadState_tvar:: "Model \<Rightarrow> CompId \<Rightarrow> int ThreadState \<Rightarrow> bool" where
+definition initial_ThreadState_tvar:: "Model \<Rightarrow> CompId \<Rightarrow> 'a ThreadState \<Rightarrow> bool" where
   "initial_ThreadState_tvar m c ts \<equiv> 
       (wf_ThreadState_tvar m c (tvar ts)) 
    \<and> (\<forall>v \<in> dom (tvar ts) . (tvar ts) v = Some(default_value))"
@@ -250,27 +297,27 @@ say that data ports always have a value in them, these definitions might need to
 reflect that -- or we can simply let the initialization phase establish a basic 
 system invariant that all data port queues have exactly one value in them. *)
 
-definition initial_ThreadState_infi:: "Model \<Rightarrow> CompId \<Rightarrow> int ThreadState \<Rightarrow> bool" where
+definition initial_ThreadState_infi:: "Model \<Rightarrow> CompId \<Rightarrow> 'a ThreadState \<Rightarrow> bool" where
   "initial_ThreadState_infi m c ts \<equiv> (wf_ThreadState_infi m c (infi ts)) \<and> dataUnavailable (infi ts)"
 
-definition initial_ThreadState_appi:: "Model \<Rightarrow> CompId \<Rightarrow> int ThreadState \<Rightarrow> bool" where
+definition initial_ThreadState_appi:: "Model \<Rightarrow> CompId \<Rightarrow> 'a ThreadState \<Rightarrow> bool" where
   "initial_ThreadState_appi m c ts \<equiv> (wf_ThreadState_appi m c (appi ts)) \<and> dataUnavailable (appi ts)"
 
-definition initial_ThreadState_appo:: "Model \<Rightarrow> CompId \<Rightarrow> int ThreadState \<Rightarrow> bool" where
+definition initial_ThreadState_appo:: "Model \<Rightarrow> CompId \<Rightarrow> 'a ThreadState \<Rightarrow> bool" where
   "initial_ThreadState_appo m c ts \<equiv> (wf_ThreadState_appo m c (appo ts)) \<and> dataUnavailable (appo ts)"
 
-definition initial_ThreadState_info:: "Model \<Rightarrow> CompId \<Rightarrow> int ThreadState \<Rightarrow> bool" where
+definition initial_ThreadState_info:: "Model \<Rightarrow> CompId \<Rightarrow> 'a ThreadState \<Rightarrow> bool" where
   "initial_ThreadState_info m c ts \<equiv> (wf_ThreadState_info m c (info ts)) \<and> dataUnavailable (info ts)"
 
 text \<open>The initial dispatch status of the thread is @{term NotEnabled}.\<close>
 
-definition initial_ThreadState_disp:: "Model \<Rightarrow> CompId \<Rightarrow> int ThreadState \<Rightarrow> bool" where
+definition initial_ThreadState_disp:: "Model \<Rightarrow> CompId \<Rightarrow> 'a ThreadState \<Rightarrow> bool" where
   "initial_ThreadState_disp m c ts \<equiv> (wf_ThreadState_disp m c (disp ts)) \<and> (disp ts = NotEnabled)"
 
 text \<open>We take the conjunction of the conditions for components of the thread state to
 get the overall predicate for a valid initial thread state.\<close>
 
-definition initial_ThreadState:: "Model \<Rightarrow> CompId \<Rightarrow> (int ThreadState) \<Rightarrow> bool"  
+definition initial_ThreadState:: "Model \<Rightarrow> CompId \<Rightarrow> ('a ThreadState) \<Rightarrow> bool"  
   where "initial_ThreadState m t ts \<equiv>
    (initial_ThreadState_infi m t ts) \<and>
    (initial_ThreadState_appi m t ts) \<and>

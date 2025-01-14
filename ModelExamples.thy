@@ -7,7 +7,7 @@ begin
 
    PortId, PortId CSet
    CompId, CompId CSet
-   Var,    Var CSet
+   VarId,  Var CSet
 
  ********************************************)
 
@@ -68,18 +68,18 @@ definition sysCompIds :: CompIds
 
 (* ------------------ Var Ids -------------------- *)
 
-(* datatype Var = Var string *)
+(* datatype VarId = Var string *)
 
-value  "Var ''myVar'' :: Var"
+value  "Var ''myVar'' :: VarId"
 
 (* type_synonym Vars = Var CSet *)
 
-value "{ Var ''a'', Var ''b'' }  :: Vars"
+value "{ Var ''a'', Var ''b'' }  :: VarIds"
 
 (* Introduce name for Var Ids to be used in system model *)
 
-definition localVarB :: Var  
-  where "localVarB = Var ''localVarB''"
+definition localVarB :: VarId
+  where "localVarB = VarId ''localVarB''"
 
 (********************************************
   Examples of Representing Port Descriptors
@@ -105,7 +105,8 @@ definition AOut0Descr where
      Out
      Data
      1
-     0"
+     0
+     DropOldest"
 
 (* portAOut1: out event data port *)
 
@@ -118,7 +119,8 @@ definition AOut1Descr where
      Out
      EventData
      1
-     0"
+     0
+     DropOldest"
 
 definition BIn2Descr :: PortDescr where (* an explicit PortDescr type can be added *)
   "BIn2Descr =
@@ -129,7 +131,8 @@ definition BIn2Descr :: PortDescr where (* an explicit PortDescr type can be add
      In
      Data
      1
-     0"
+     0
+     DropOldest"
 
 definition BIn3Descr where
   "BIn3Descr =
@@ -140,7 +143,8 @@ definition BIn3Descr where
      In
      EventData
      1
-     0"
+     0
+     DropOldest"
 
 (********************************************
   Examples of Representing Component Descriptors
@@ -152,7 +156,7 @@ record CompDescr =
   portIds :: "PortIds" (* ports belonging to this component *)
   dispatchProtocol :: "DispatchProtocol"  
   dispatchTriggers :: "PortIds" (* ids of ports that can trigger a dispatch *)
-  compVars :: "Vars" 
+  varIds :: "VarIds" 
 
  ********************************************)
 
@@ -177,7 +181,7 @@ definition BDescr where
      BId
      {BIn2Id, BIn3Id}
      Sporadic
-     {BIn2Id, BIn3Id}
+     {BIn3Id}
      {localVarB}"
 
 
@@ -299,6 +303,15 @@ lemma sysModel_wf_Model_PortDescr: "wf_Model_PortDescr sysModel"
   done
 *)
 
+(*
+definition wf_Model_Finite :: "Model \<Rightarrow> bool" 
+  where "wf_Model_Finite m \<equiv> 
+    finite (dom (modelCompDescrs m)) \<and> 
+    finite (dom (modelPortDescrs m))"
+*)
+
+lemma sysModel_wf_Model_Finite : "wf_Model_Finite sysModel"
+  by (simp add: wf_Model_Finite_def)
 
 lemma sysModel_wf_Model_PortDescr: "wf_Model_PortDescr sysModel"
   by (simp add: wf_Model_PortDescr_def wf_PortDescr_def) 
@@ -324,18 +337,29 @@ lemma sysModel_wf_Model_DisjointPortIds: "wf_Model_DisjointPortIds sysModel"
 lemma sysModel_wf_Model_ConnsPortCategories: "wf_Model_ConnsPortCategories sysModel"
   by (simp add: wf_Model_ConnsPortCategories_def)
 
-lemma sysModel_wf_Model_InDataPorts: "wf_Model_InDataPorts sysModel"
-  by (simp add: wf_Model_InDataPorts_def)
+lemma sysModel_wf_Model_ConnsNoDataPortFanIn: "wf_Model_ConnsNoDataPortFanIn sysModel"
+  by (simp add: wf_Model_ConnsNoDataPortFanIn_def)
+
+lemma sysModel_wf_Model_CompDescrsDispatchTriggers: "wf_Model_CompDescrsDispatchTriggers sysModel"
+  by (simp add: wf_Model_CompDescrsDispatchTriggers_def)
 
 lemma sysModel_wf_Model_SporadicComp: "wf_Model_SporadicComp sysModel"
   by (simp add: wf_Model_SporadicComp_def)
 
+lemma sysModel_wf_Model_PeriodicComp: "wf_Model_PeriodicComp sysModel"
+  by (simp add: wf_Model_PeriodicComp_def)
+
 lemma sysModel_wf_Model: "wf_Model sysModel"
-  using sysModel_wf_Model_CompDescrsContainedPortIds sysModel_wf_Model_CompDescrsIds 
-        sysModel_wf_Model_ConnsPortCategories sysModel_wf_Model_ConnsPortIds 
-        sysModel_wf_Model_DisjointPortIds sysModel_wf_Model_InDataPorts 
+  using sysModel_wf_Model_Finite
+        sysModel_wf_Model_CompDescrsContainedPortIds sysModel_wf_Model_CompDescrsIds 
+        sysModel_wf_Model_ConnsPortCategories sysModel_wf_Model_ConnsPortIds
+        sysModel_wf_Model_ConnsNoDataPortFanIn
+        sysModel_wf_Model_DisjointPortIds  
         sysModel_wf_Model_PortDescr sysModel_wf_Model_PortDescrsCompId 
-        sysModel_wf_Model_PortDescrsIds sysModel_wf_Model_SporadicComp wf_Model_def 
+        sysModel_wf_Model_PortDescrsIds 
+        sysModel_wf_Model_CompDescrsDispatchTriggers
+        sysModel_wf_Model_SporadicComp sysModel_wf_Model_PeriodicComp
+        wf_Model_def 
   by blast
 
 end

@@ -22,7 +22,7 @@ port states below.
 *) 
 
 definition emptyq:: "int Queue" where [simp add]:
- "emptyq = mk_empty_queue 1 DropEarliest"
+ "emptyq = mk_empty_queue 1 DropOldest"
 
 (* Comp A has no variables *)
 definition compA_tvar_initial:: "int VarState" where [simp add]:

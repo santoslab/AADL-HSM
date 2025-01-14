@@ -1,12 +1,15 @@
-section "Port States"
+section \<open>Port States \label{sec:port-states}\<close>
 
 text \<open>An AADL thread communicates with other threads over ports.  Each port has some
 type of storage associated with it: a data port has a memory slot to hold a single
 value, an event data port has a queue/buffer to hold messages, and an event port
 has a queue/buffer to hold signals (null messages) indicating the presence of an event.
-To simplify the semantics, we represent the storage for every kind of port using
-a queue defined in Queue.thy.  Queues associated with data ports
-will be constrained to always have size one.
+To simplify the semantics, we adopt a uniform representation the storage for 
+every kind of port using queues defined in Queue.thy (Section~\ref{sec:queues}).  
+This is further justified
+by the language in Section 8.3 (3) of the AADL standard: "Data ports are event data
+ports with a queue size of one in which the newest arrival is kept" and 
+"Event ports are event data ports with empty message content".
 
 The runtime needs to be able to associate a model-declared port to 
 storage storage for the port.  In HAMR, this is implemented by associating
@@ -14,7 +17,7 @@ a @{term PortId} to a queue data structure.  In this semantics mechanization,
 we introduce the type @{term PortState} -- a mapping from @{term PortId} 
 to @{term Queue} to realize that association for each thread.   
 For simplicity, we provide separate @{term PortState}s for input and output ports.  
-Further, Hatcliff-al:ISOLA22 argued that the AADL runtime semantics implies that
+Further, \cite{Hatcliff-al:ISOLA22} argued that the AADL runtime semantics implies that
 there is a distinction between the application's view of a port's state,
 and the communication infrastructure's view of a port's state (see, for example,  
 Section 8.3.1 (7) of the standard).  Thus,
@@ -26,7 +29,7 @@ a @{term ThreadState} will include four @{term PortState} structures:
 \item @{term iout} - infrastructure output port state (representing the infrastructure's view of output ports)
 \end{itemize}
 
-The PortState.thy theory provides:
+This theory provides:
 \begin{itemize}
 \item the definition of a port state data structure
 \item definitions of well-formed port states
@@ -35,7 +38,7 @@ The PortState.thy theory provides:
 \end{itemize}
 
 The theory depends on SetsAndMaps.thy for the map type that implements the port state,
-Queue.thy for storage for each port, and Model.thy to provide the basis for well-formedness
+Queue.thy (Section~\ref{sec:queues}) for storage for each port, and Model.thy to provide the basis for well-formedness
 (i.e., the contents of the port states are aligned with the port declarations in the model).
 \<close>
 
@@ -63,22 +66,26 @@ text \<open>A @{term PortState} is well-formed wrt some set of PortIds if its do
    on port state maintain a domain that is aligned with a set of ports
    declared in a component (e.g., all input ports of the component).\<close>
 
-definition wf_PortState_dom :: " PortId set \<Rightarrow> 'a PortState \<Rightarrow> bool" where 
-  "wf_PortState_dom pids ps \<equiv> (dom ps) = pids"
-
+definition wf_PortState_dom :: "Model \<Rightarrow> PortId set \<Rightarrow> 'a PortState \<Rightarrow> bool" where 
+  "wf_PortState_dom m pids ps \<equiv> ((dom ps) = pids) \<and> (dom ps) \<subseteq> modelPIDs m"
 
 text \<open>A @{term PortState} is well-formed if every @{term PortId} in the port state
-is associated with a well-formed @{term Queue} @{term q} (as defined in Queue.thy)
-and the capacity of the @{term q} is equal to the model-declared size of the
-queue as found in the model @{term PortDescr} @{term pd} .\<close>
+is associated with a well-formed @{term Queue} @{term q} (as defined in Queue.thy -- Section~\ref{sec:queues}),
+the capacity of the @{term q} is equal to the model-declared size of the
+queue as found in the model @{term PortDescr} @{term pd},
+and the overflow handling protocol in @{term q} matches
+the model-declared value in @{term pd}.\<close>
 
 definition wf_PortState_queue :: "Model \<Rightarrow> PortId \<Rightarrow> 'a Queue \<Rightarrow> bool" where
   "wf_PortState_queue m p q \<equiv> 
+    (wf_Queue q \<and> qsize q = queueSize ((modelPortDescrs m) $ p) \<and> 
+                    qohp q = ohp ((modelPortDescrs m) $ p))"
+    (* proof automation (e.g., fastforce) works less well when this nicer
+       version with let below is used 
      let pd = (modelPortDescrs m) $ p 
-                in (wf_Queue q \<and> capacity q = size pd)"
-
-text \<open>ToDo: Add well-formedness properties that constrain the strategy 
-fields to match what is in the port descr for the port.\<close>
+                in (wf_Queue q \<and> qsize q = queueSize pd \<and> qohp q = ohp pd)
+     I wish I could figure out how to fix this.
+     *)
 
 definition wf_PortState_queues :: "Model \<Rightarrow> PortId set \<Rightarrow> 'a PortState \<Rightarrow> bool" where 
 (* Old definition
@@ -90,7 +97,7 @@ definition wf_PortState_queues :: "Model \<Rightarrow> PortId set \<Rightarrow> 
 text \<open>The following definition conjoins the well-formedness properties above.\<close>
 
 definition wf_PortState :: "Model \<Rightarrow> PortId set \<Rightarrow> 'a PortState \<Rightarrow> bool" where 
-  "wf_PortState m pids ps  \<equiv>   wf_PortState_dom pids ps
+  "wf_PortState m pids ps  \<equiv>   wf_PortState_dom m pids ps
                              \<and> wf_PortState_queues m pids ps"
 
 text \<open>The following helper lemmas establish properties of elements (queues, buffers)
@@ -112,9 +119,9 @@ shows "wf_PortState_queue m p (ps $ p)"
 subsection "Operations"
 
 text \<open>We define a number of helper functions for working with port
-states.  As a naming convention, operations with "PID" in the name
+states.  As a naming convention, operations with ``PID'' in the name
 take a @{term PortId} argument as a reference to a port;
-operations with "PD" in the name to a @{term PortDescr} as a reference
+operations with ``PD'' in the name to a @{term PortDescr} as a reference
 to a port.\<close>
 
 subsubsection \<open>Accessor Operations\<close>
@@ -204,12 +211,12 @@ all the queue buffers in the set of ports @{term pids}'s.\<close>
 fun clearAll :: "PortId set \<Rightarrow> 'a PortState \<Rightarrow> 'a PortState"
   where "clearAll pids ps = (\<lambda>p. if p \<in> pids then Some (clear (ps $ p)) else ps p)"
 
-text \<open>The following property provides a "sanity check" on a couple of the opeations
+text \<open>The following property provides a ``sanity check'' on a couple of the operations
 above: enqueueing a value and then dequeueing yields an identical queue value.\<close>
 
 lemma portEnqueueDequeue_empty:
   assumes avail: "portDefinedPID ps p"
-      and capa: "capacity (ps $ p) > 0"
+      and capa: "qsize (ps $ p) > 0"
       and empty: "isEmpty (ps $ p)"
     shows "portDequeuePID (portEnqueuePID ps p x) p = ps"
 proof -
@@ -220,28 +227,28 @@ proof -
     show "portDequeuePID (portEnqueuePID ps p x) p q = ps q"
     proof (cases "p = q")
       case True
-      obtain e b c s where h0: "ps p = Some \<lparr> error= e, buffer= b, capacity= c, strategy = s \<rparr>"
+      obtain e b c s where h0: "ps p = Some \<lparr> error= e, buffer= b, qsize= c, qohp = s \<rparr>"
         by (metis Queue.cases avail domD portDefinedPID.elims(2))
       have h1: "b = []"
         using empty h0 by fastforce
-      have h6: "length [] < capacity (ps $ p)"
+      have h6: "length [] < qsize (ps $ p)"
         using capa by fastforce
       have h4: "buffer (push (ps $ p) x) = [x]"
-        by (metis append_Nil capa empty isEmpty.elims(2) list.size(3) push_within_capacity)
+        by (metis append_Nil capa empty isEmpty.elims(2) list.size(3) push_within_qsize)
       have h5: "error (push (ps $ p) x) = error (ps $ p)"
         by (metis capa empty isEmpty.simps list.size(3) push_no_error)
       have h7: "error (ps $ p) = e"
         by (simp add: h0)
       have h2: "portEnqueuePID ps p x p = Some(push (ps $ p) x)"
         by simp
-      have h2: "portEnqueuePID ps p x p = Some \<lparr> error= e, buffer= [x], capacity= c, strategy = s \<rparr>"
+      have h2: "portEnqueuePID ps p x p = Some \<lparr> error= e, buffer= [x], qsize= c, qohp = s \<rparr>"
         using h0 h1 h2 h4 h5 
-          map_some_val_given[of ps p "\<lparr> error= e, buffer= b, capacity= c, strategy = s \<rparr>"]
+          map_some_val_given[of ps p "\<lparr> error= e, buffer= b, qsize= c, qohp = s \<rparr>"]
         by (smt (verit, ccfv_threshold) Queue.equality Queue.select_convs(1) Queue.select_convs(2) 
-           Queue.select_convs(3) Queue.select_convs(4) old.unit.exhaust push_frame_capacity 
-           push_frame_strategy)
+           Queue.select_convs(3) Queue.select_convs(4) old.unit.exhaust push_frame_qsize 
+           push_frame_qohp)
       have h3: "portDequeuePID (portEnqueuePID ps p x) p p = 
-                Some \<lparr> error= e, buffer= b, capacity= c, strategy = s \<rparr>"
+                Some \<lparr> error= e, buffer= b, qsize= c, qohp = s \<rparr>"
         using h1 h2 by auto
       then show ?thesis
         using h0 by force
@@ -272,9 +279,9 @@ text \<open>If we perform @{term portReplacePID} for port id @{term p} that exis
       then the resulting port state has the same domain.\<close>
 
 lemma portReplacePID_preserves_wf_PortState_dom:
-  assumes wf_ps_dom:   "wf_PortState_dom dom_pids ps" 
+  assumes wf_ps_dom:   "wf_PortState_dom m dom_pids ps" 
       and p_in_dom: "p \<in> dom_pids"
-    shows "wf_PortState_dom dom_pids (portReplacePID ps p q) "
+    shows "wf_PortState_dom m dom_pids (portReplacePID ps p q) "
 using wf_ps_dom p_in_dom 
   by (auto simp add: wf_PortState_dom_def)
 
@@ -324,22 +331,23 @@ text \<open>If we perform @{term portReplaceBufferPID} for port id @{term p} tha
       then the resulting port state has the same domain.\<close>
 
 lemma portReplaceBufferPID_preserves_wf_PortState_dom:
-  assumes wf_ps_dom:   "wf_PortState_dom dom_pids ps" 
+  assumes wf_ps_dom:   "wf_PortState_dom m dom_pids ps" 
       and p_in_dom: "p \<in> dom_pids"
-    shows "wf_PortState_dom dom_pids (portReplaceBufferPID ps p b) "
+    shows "wf_PortState_dom m dom_pids (portReplaceBufferPID ps p b) "
 using wf_ps_dom p_in_dom 
   by (auto simp add: wf_PortState_dom_def)
 
-text \<open>****Update***** If we perform @{term portReplaceBufferPID} for port id @{term p} that exists 
-      within well-formed port state @{term ps} and the new queue is also well-formed 
-      with respect to the model, 
+text \<open>Given a well-formed port state @{term ps}, and a pid @{term p} that is in the
+      domain of the port state, and a buffer @{term b} that is well-formed (it's length
+      does not exceed the maximum capacity declared for the port),
+      if we perform @{term portReplaceBufferPID} 
       then the queues in the resulting port state all well-formed
       with respect to the model.\<close>
 
 lemma portReplaceBufferPID_preserves_wf_PortState_queues:
   assumes wf_ps: "wf_PortState m dom_pids ps"
       and p_in_dom: "p \<in> dom_pids"
-      and b_wf: "length b \<le> (sizePID m p)"
+      and b_wf: "length b \<le> (queueSizePID m p)"
     shows "wf_PortState_queues m dom_pids (portReplaceBufferPID ps p b)"
   using wf_ps  \<comment> \<open>assume we start with well-formed port states\<close>  
         p_in_dom 
@@ -347,7 +355,9 @@ lemma portReplaceBufferPID_preserves_wf_PortState_queues:
         wf_PortState_queue_def  \<comment> \<open>well-formedness definitions and associated properties\<close>
         wf_PortState_queues_def
         wf_PortState_implies_wf_PortState_queue 
-        setBuffer_wf \<comment> \<open>setting wf buffer within wf queue produces wf queue\<close>
+         setBuffer_wf \<comment> \<open>setting wf buffer within wf queue produces wf queue\<close>
+        setBuffer_frame_qsize \<comment> \<open>setBuffer frame conditions\<close>
+        setBuffer_frame_qohp 
   by fastforce
 
 
@@ -356,7 +366,7 @@ text \<open>@{term portReplacePID} preserves port state well-formedness.\<close>
 lemma portReplaceBufferPID_preserves_wf_PortState:
   assumes wf_ps:   "wf_PortState m dom_pids ps" 
       and p_in_dom: "p \<in> dom_pids"
-      and b_wf: "length b \<le> (sizePID m p)"
+      and b_wf: "length b \<le> (queueSizePID m p)"
     shows "wf_PortState m dom_pids (portReplaceBufferPID ps p b)"
   using wf_ps \<comment> \<open>assume we start with well-formed port states\<close>
         p_in_dom 
@@ -378,9 +388,9 @@ text \<open>If we perform @{term portDequeuePID} for port id @{term p} that exis
       then the resulting port state has the same domain.\<close>
 
 lemma portDequeuePID_preserves_wf_PortState_dom: 
-  assumes wf_ps_dom:   "wf_PortState_dom dom_pids ps" 
+  assumes wf_ps_dom:   "wf_PortState_dom m dom_pids ps" 
       and p_in_dom: "p \<in> dom_pids"
-    shows "wf_PortState_dom  dom_pids (portDequeuePID ps p)"
+    shows "wf_PortState_dom m dom_pids (portDequeuePID ps p)"
   using wf_ps_dom p_in_dom 
   by (auto simp add: wf_PortState_dom_def)
 
@@ -399,7 +409,8 @@ proof -
     using wf_operand_queue (* well-formed input to the dequeue operation *)
           tail_wf (* properties of tail used in the dequeue operation *)
           wf_PortState_queue_def  
-       by fastforce 
+          tail_wf 
+       by force
     (* ToDo: I'm surprised I don't need the frame conditions on tail to prove this.
         I would expect something like what is given below
     using 
@@ -434,14 +445,14 @@ lemma portDequeuePID_preserves_wf_PortState_queues:
 
 text \<open>@{term portDequeuePID} preserves port state well-formedness.\<close>
 
-lemma pdeq_preserves_wf_PortState: 
+lemma portDequeuePID_preserves_wf_PortState: 
  assumes wf_ps:   "wf_PortState m dom_pids ps " 
       and p_in_dom: "p \<in> dom_pids"
     shows "wf_PortState m dom_pids (portDequeuePID ps p)"
-  using wf_ps p_in_dom (* assumptions *)
-        portDequeuePID_preserves_wf_PortState_dom (* lemmas showing subproperties of wf preserved *)
+  using wf_ps p_in_dom \<comment> \<open>assumptions\<close>
+        portDequeuePID_preserves_wf_PortState_dom \<comment> \<open>lemmas showing subproperties of wf preserved\<close>
         portDequeuePID_preserves_wf_PortState_queues 
-        wf_PortState_def (* definition of well-formedness *)
+        wf_PortState_def \<comment> \<open>definition of well-formedness\<close> 
      by blast
 
 (* old proof
@@ -469,9 +480,9 @@ text \<open>If we perform @{term portEnqueuePID} for port id @{term p} that exis
       then the resulting port state has the same domain.\<close>
 
 lemma portEnqueuePID_preserves_wf_PortState_dom:
-  assumes wf_ps_dom:   "wf_PortState_dom dom_pids ps" 
+  assumes wf_ps_dom:   "wf_PortState_dom m dom_pids ps" 
       and p_in_dom: "p \<in> dom_pids"
-    shows "wf_PortState_dom dom_pids (portEnqueuePID ps p v) "
+    shows "wf_PortState_dom m dom_pids (portEnqueuePID ps p v) "
 using wf_ps_dom p_in_dom 
   by (auto simp add: wf_PortState_dom_def)
 
@@ -483,22 +494,38 @@ lemma portEnqueuePID_preserves_wf_PortState_queue:
   assumes wf_ps: "wf_PortState m dom_pids ps"
       and p_in_dom: "p \<in> dom_pids"
     shows "wf_PortState_queue m p ((portEnqueuePID ps p v) $ p)"
-(* ToDo (from John): make this easier to read by introducing names for the old and new queues *)
 proof -
-  from wf_ps p_in_dom have wf_operand_portstate_queue: "wf_PortState_queue m p (ps $ p)" 
+  \<comment> \<open>Introduce names for original and updated queue.\<close>
+  let ?orgq = "ps $ p"
+  let ?newq = "(portEnqueuePID ps p v) $ p"
+  \<comment> \<open>Since the original port state is wf (assumption), 
+      we know the original queue for @{term p} is wf\<close>
+  from wf_ps p_in_dom have wf_operand_portstate_queue: "wf_PortState_queue m p ?orgq" 
     by (rule wf_PortState_implies_wf_PortState_queue)
+  \<comment> \<open>Since @{term push} preserves wf, we know the new queue is wf.\<close>
   from p_in_dom wf_operand_portstate_queue
-  have wf_result_push_queue: "wf_Queue (push (ps $ p) v)"
+  have wf_result_push_queue: "wf_Queue (push ?orgq v)"
     using push_wf wf_PortState_queue_def
     by metis
+  \<comment> \<open>Restate new queue (and well-formedness) in terms of the entire port state.\<close>
   from p_in_dom wf_result_push_queue 
-  have wf_result_queue: "wf_Queue ((portEnqueuePID ps p v) $ p)"
+  have wf_result_queue: "wf_Queue ?newq"
     using push_wf p_in_dom wf_operand_portstate_queue
     by simp
-  have capacity_preserved: "capacity ((portEnqueuePID ps p v) $ p) = capacity (ps $ p)"
-    using p_in_dom push_frame_capacity
+  \<comment> \<open>frame condition for @{term qsize}.\<close>
+  have qsize_preserved: "qsize ?newq = qsize ?orgq"
+    using p_in_dom push_frame_qsize
     by (metis fun_upd_same map_some_val_given portEnqueuePID.simps) (* ToDo *)
-  from p_in_dom wf_operand_portstate_queue wf_result_queue capacity_preserved
+  \<comment> \<open>frame condition for @{term qohp}.\<close>
+  have qohp_preserved: "qohp ?newq = qohp ?orgq"
+    using p_in_dom push_frame_qohp
+    by (metis fun_upd_same map_some_val_given portEnqueuePID.simps) (* ToDo *)
+  \<comment> \<open>..prove thesis\<close>
+  from p_in_dom 
+       wf_operand_portstate_queue \<comment> \<open>input queue is wf\<close>
+       wf_result_queue  \<comment> \<open>output queue is wf\<close>
+       qsize_preserved \<comment> \<open>frame conditions on portEnqueue\<close>
+       qohp_preserved
   show ?thesis
     by (metis wf_PortState_queue_def)
 qed   

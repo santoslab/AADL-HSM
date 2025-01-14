@@ -12,6 +12,7 @@ session "hamr-isabelle-V1" = HOL +
     ThreadState
     DispatchLogic
     SystemState
+    RTSRules
     RuntimeExamples
     App
     Behavior
@@ -23,3 +24,5 @@ session "hamr-isabelle-V1" = HOL +
     "temp-control-aadl-overview.tex"
     "listings-aadl-format.tex"
     "temp-control-graphical.png"
+    "root.bib"
+

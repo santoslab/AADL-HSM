@@ -2,11 +2,15 @@ theory SetsAndMaps
   imports Main
 begin
 
-definition opt_get :: "'a option \<Rightarrow> 'a" 
-  where [simp add]: "opt_get optval \<equiv> (THE v . optval = Some v)"
+section "States as Partial Functions"
 
+(* Gerwin suggested that using "the" directly below would help with proof automation *)
+definition opt_get :: "'a option \<Rightarrow> 'a" 
+  where [simp add]: "opt_get optval \<equiv> the optval"
+
+(* Gerwin suggested that using "the" directly below would help with proof automation *)
 definition map_get :: "('a, 'b) map \<Rightarrow> 'a \<Rightarrow> 'b"  (infixl "$" 73)
-  where [simp add]: "map_get m k = opt_get (m k)"
+  where [simp add]: "map_get m k = the (m k)"
 
 lemma map_some_val: 
   assumes "x \<in> dom f"
@@ -30,6 +34,8 @@ lemma singleton_unfold: "[a \<mapsto> b] = (\<lambda>x. if x = a then Some b els
 lemma singleton_map_upd: "m(a\<mapsto>b) = m ++ [a \<mapsto> b]"
   unfolding map_add_def singleton_unfold
   by fastforce
+
+section "Sets of States and State Updates"
 
 definition map_Add (infixl "**" 100) where "map_Add X Y = {x ++ y | x y. x \<in> X \<and> y \<in> Y }"
 
@@ -77,6 +83,8 @@ lemma map_Add_extend:
     shows "x \<in> T"
   using x d
   by (smt (verit) CollectD Un_absorb2 dom_map_add map_Add_def map_le_antisym map_le_def map_le_map_add)
+
+section "Merging States"
 
 definition merge :: "('a \<rightharpoonup> 'b) \<Rightarrow> ('a \<rightharpoonup> 'b) \<Rightarrow> ('a \<rightharpoonup> 'b)" (infixl "\<uplus>\<^sub>m" 55) where
   "m\<^sub>1 \<uplus>\<^sub>m m\<^sub>2 \<equiv> \<lambda>a. if \<exists>y. {Some y} = {m\<^sub>1 a, m\<^sub>2 a} - {None} then (THE b. b \<in> {m\<^sub>1 a, m\<^sub>2 a} - {None}) else None"
@@ -435,6 +443,10 @@ next
     then show "(m\<^sub>1 \<uplus>\<^sub>m m\<^sub>2) a = (m\<^sub>1 ++ m\<^sub>2) a" using y1 by presburger
   qed
 qed
+
+section "State and State Update Reordering by Way of Merging"
+
+subsection "State and State Sequences"
 
 fun map_add_seq where
   "map_add_seq s [] = s"
@@ -903,6 +915,8 @@ next
   qed
 qed
 
+subsection "State Pair Sequences"
+
 fun map_add_seq_pair where
   "map_add_seq_pair (s\<^sub>1, s\<^sub>2) [] = (s\<^sub>1, s\<^sub>2)"
 | "map_add_seq_pair (s\<^sub>1, s\<^sub>2) ((m\<^sub>1, m\<^sub>2)#ms) = map_add_seq_pair (s\<^sub>1 ++ m\<^sub>1, s\<^sub>2 ++ m\<^sub>2) ms"
@@ -936,6 +950,8 @@ lemma map_update_merge:
   assumes d: "a \<notin> dom m"
   shows "[a\<mapsto>b] ++ m = [a\<mapsto>b] \<uplus>\<^sub>m m"
   by (simp add: d map_add_merge)
+
+subsection "Indexed State and State Update Sequences"
 
 fun map_upd_seq where 
   "map_upd_seq f s [] = s"
@@ -1003,6 +1019,8 @@ proof -
   hence h3: "... = s ++ (\<Uplus>\<^sub>m { [x \<mapsto> f x] | x. x \<in> set xs })" using h4 ms1 by presburger
   show ?thesis using h0 h2 h4 ms1 by auto    
 qed
+
+subsection "Indexed Sequences of State Sets"
 
 fun map_Upd_seq where
   "map_Upd_seq f S [] = S"
@@ -1231,6 +1249,8 @@ next
     using h1 unfolding maps_of_def seq_of_maps_def apply clarify by fastforce
   then show ?case by (metis h2 seq_of_maps_def)
 qed
+
+subsection "Merging of Indexed Sequences of State Sets"
 
 lemma map_Upd_Merge:
   assumes c: "card (set xs) = length xs"

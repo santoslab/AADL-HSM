@@ -4,7 +4,7 @@ theory App
   imports Main VarState PortState ThreadState Model
 begin
 
-subsection \<open>Application Logic Relations\<close>
+subsection \<open>Application Logic Relations \label{subsec:app-logic-relations}\<close>
 
 text \<open>The application code for an AADL Thread component is organized into entry points.
 This semantics currently supports the Initialization and Compute entry points.
@@ -182,6 +182,16 @@ definition wf_InitBehavior_Inhabited:: "Model \<Rightarrow> CompId \<Rightarrow>
   where "wf_InitBehavior_Inhabited m c initBehavior \<equiv>
     (\<exists>ao tvo . initBehavior ao tvo)"
 
+(* Stefan: We should change this into an implication where
+         wf_ThreadState_appi m c ai
+       \<and> wf_ThreadState_dataPorts m c ai 
+       \<and> wf_ThreadState_tvar m c tvi
+are added on the left-hand side of the implication.
+This will express that the semantics guarantees wf given that the apps preserve it,
+a contract between the app code and the AADL infrastructure.
+  Operation clearAll must be changed to incorporate the data port constraints.
+*)
+
 definition wf_ComputeBehavior:: "Model \<Rightarrow> CompId \<Rightarrow> 'a ComputeBehavior \<Rightarrow> bool" 
   where "wf_ComputeBehavior m c computeBehavior \<equiv>
     (\<forall>ai tvi ds ao tvo . computeBehavior ai tvi ds ao tvo \<longrightarrow> 
@@ -225,25 +235,9 @@ if each @{term AppBehavior} is well-formed wrt the associated component.
 
 definition wf_AppBehaviors where "wf_AppBehaviors m cb \<equiv> \<forall>c. wf_AppBehavior m c (cb $ c)"
 
-record 'a BehaviorModel =
-  bmmodel :: "Model"
-  bmbehaviors :: "'a AppBehaviors"
-
-definition wf_BehaviorModel where 
-  "wf_BehaviorModel bm \<equiv> 
-       wf_Model (bmmodel bm) 
-     \<and> wf_AppBehaviors (bmmodel bm) (bmbehaviors bm)"
-
-
-text \<open>The following helper functions are defined to access elements of a @{term BehaviorModel}.\<close>
-
-fun bmodelCompDescrs where "bmodelCompDescrs bm = modelCompDescrs (bmmodel bm)"
-fun bmodelPortDescrs where "bmodelPortDescrs bm = modelPortDescrs (bmmodel bm)"
-fun bmodelPortKind where "bmodelPortKind bm p = kind ((bmodelPortDescrs bm) $ p)"
-fun bmodelConns where "bmodelConns bm = modelConns (bmmodel bm)"
-fun bmodelCIDs where "bmodelCIDs bm = dom (bmodelCompDescrs bm)"
-fun bmodelPIDs where "bmodelPIDs bm = dom (bmodelPortDescrs bm)"
-fun bmodelInit where "bmodelInit bm c = appInit (bmbehaviors bm $ c)"
-fun bmodelCompute where "bmodelCompute bm c = appCompute (bmbehaviors bm $ c)"
+(* Need to move this remark from the AADL standard Section 8.3.1 (6) to the appropriate place
+  (6) Event and event data ports may dispatch a port specific Compute_Entrypoint. This permits threads with
+multiple event or event data ports to execute different source text sequences for events arriving at different event
+ports.  *)
 
 end

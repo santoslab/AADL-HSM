@@ -16,7 +16,7 @@ In this Isabelle formalization, specifications of thread application logic
 are not ``hard-wired'' to GUMBO style contracts, but they are designed 
 to be sufficient for representing GUMBO contracts.  Accordingly, 
 thread application logic behavior is defined in terms of relations as described above
-(see XXXX App.thy XXXX).
+(see Section~\ref{subsec:app-logic-relations}).
 
 To support the above concepts, the representation of thread's state includes
 values of thread-local variables, e.g., as declared in GUMBO state declarations.
@@ -24,7 +24,7 @@ When HAMR generates the Isabelle representation of threads, it will automaticall
 generate from GUMBO state declarations a listing of thread-local variables 
 in each threads @{term CompDescr}.   Intuitively, each thread state includes a 
 @{term VarState} field representing a ``store'' that maps
-each @{term CompDescr} specified local variables to values.  
+each @{term CompDescr} specified local variable to a value.  
 \<close>
 
 theory VarState
@@ -41,16 +41,16 @@ developed at this point, so we parameterize the @{term VarState}
 of a type \emph{a} representing a universal value type.
 \<close>
 
-type_synonym 'a VarState = "(Var, 'a) map"
+type_synonym 'a VarState = "(VarId, 'a) map"
 
 text \<open>Currently, we do not have any conditions for well-formedness
 for a VarState.  Later on, we will need to add conditions, e.g., to indicate
 stored values match a variable's type.  So leave a placeholder for well-formedness.\<close>
 
-definition wf_VarState_dom :: "'a VarState \<Rightarrow> Var set \<Rightarrow> bool" where 
+definition wf_VarState_dom :: "'a VarState \<Rightarrow> VarIds \<Rightarrow> bool" where 
   "wf_VarState_dom vs vars \<equiv> (dom vs) = vars"
 
-definition wf_VarState :: "'a VarState \<Rightarrow> Var set \<Rightarrow> bool" where 
+definition wf_VarState :: "'a VarState \<Rightarrow> VarIds \<Rightarrow> bool" where 
   "wf_VarState vs vars \<equiv> wf_VarState_dom vs vars"
 
 end
